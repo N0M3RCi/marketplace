@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "PORT=3001 tsx watch src/index.ts",
-    "start": "PORT=3001 tsx src/index.ts",
+    "start": "tsx src/index.ts",
     "migrate": "PORT=3001 tsx src/migrate.ts",
     "seed": "PORT=3001 tsx src/seed.ts"
   },

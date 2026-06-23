@@ -88,10 +88,20 @@ app.get('*', (_req, res) => {
   res.sendFile(path.join(distPath, 'index.html'));
 });
 
-// Start server
+// Start server — listen immediately, then run migrations in background
 async function start() {
+  const httpServer = http.createServer(app);
+  setupSocket(httpServer);
+
+  httpServer.listen(PORT, '0.0.0.0', () => {
+    console.log(`Server running on port ${PORT}`);
+    // Run SQL migrations in background so startup is not blocked
+    runMigrations();
+  });
+}
+
+async function runMigrations() {
   try {
-    // Run SQL migrations on startup
     await pool.query(`
       -- Categories
       CREATE TABLE IF NOT EXISTS categories (id UUID PRIMARY KEY DEFAULT gen_random_uuid(), name TEXT NOT NULL, slug TEXT NOT NULL UNIQUE, icon TEXT DEFAULT 'Tag', listing_count INTEGER DEFAULT 0, color TEXT DEFAULT 'text-gray-600');
@@ -122,13 +132,6 @@ async function start() {
   } catch (err) {
     console.error('Migration error:', err);
   }
-
-  const httpServer = http.createServer(app);
-  setupSocket(httpServer);
-
-  httpServer.listen(PORT, '0.0.0.0', () => {
-    console.log(`Server running on port ${PORT}`);
-  });
 }
 
 start();
