@@ -26,6 +26,15 @@ const app = express();
 // Use port 3001 as default (Vite dev server uses 3000)
 const PORT = parseInt(process.env.PORT || '3001', 10);
 
+// Ready flag: blocked until migrations complete
+let dbReady = false;
+
+// Block API requests until migrations finish — port is still open for Railway health
+app.use('/api', (_req, res, next) => {
+  if (dbReady) return next();
+  res.status(503).json({ error: 'Service initializing, please try again in a moment' });
+});
+
 // Middleware
 app.use(cors());
 app.use(express.json({ limit: '50mb' }));
@@ -132,6 +141,8 @@ async function runMigrations() {
   } catch (err) {
     console.error('Migration error:', err);
   }
+  dbReady = true;
+  console.log('Server ready to accept API requests.');
 }
 
 start();
