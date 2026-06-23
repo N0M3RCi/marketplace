@@ -2,6 +2,7 @@ import { Heart, MapPin, Star, Eye, ShieldCheck } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { Badge } from '@/components/ui/badge';
 import { cn, formatCurrency } from '@/lib/utils';
+import { useCurrencyStore } from '@/lib/currencyStore';
 import type { Listing } from '@/types';
 
 interface ListingCardProps {
@@ -18,6 +19,8 @@ const conditionConfig = {
 
 export default function ListingCard({ listing, onFavorite }: ListingCardProps) {
   const condConf = conditionConfig[listing.condition];
+  const { displayCurrency, formatConverted } = useCurrencyStore();
+  const showConverted = displayCurrency !== (listing.currency || 'USD');
 
   return (
     <Link to={`/listing/${listing.id}`} className="group block">
@@ -68,8 +71,15 @@ export default function ListingCard({ listing, onFavorite }: ListingCardProps) {
           </div>
 
           <p className="text-xl font-bold text-[hsl(var(--brand-navy))] font-heading mb-3">
-            {formatCurrency(listing.price, listing.currency)}
+            {listing.currency && displayCurrency !== listing.currency
+              ? formatConverted(listing.price, listing.currency)
+              : formatCurrency(listing.price, listing.currency)}
           </p>
+          {listing.currency && displayCurrency !== listing.currency && (
+            <p className="text-xs font-medium -mt-2.5 mb-3" style={{ color: '#9A7C40' }}>
+              {formatCurrency(listing.price, listing.currency)} {listing.currency}
+            </p>
+          )}
 
           <div className="flex items-center justify-between text-xs text-muted-foreground">
             <div className="flex items-center gap-1">

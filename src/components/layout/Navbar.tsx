@@ -1,10 +1,11 @@
 import { useState, useEffect } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { Shield, Bell, Search, Menu, X, ChevronDown, LogOut, Settings, User, LayoutDashboard, MessageSquare, Wallet, Plus } from 'lucide-react';
+import { Shield, Bell, Search, Menu, X, ChevronDown, LogOut, Settings, User, LayoutDashboard, MessageSquare, Wallet, Plus, DollarSign } from 'lucide-react';
 import { cn, getInitials } from '@/lib/utils';
 import { useAuth } from '@/hooks/useAuth';
 import { fetchNotifications, markNotificationRead } from '@/lib/api';
 import { formatRelativeTime } from '@/lib/utils';
+import { useCurrencyStore, SUPPORTED_CURRENCIES } from '@/lib/currencyStore';
 import type { Notification } from '@/types';
 
 export default function Navbar() {
@@ -13,9 +14,15 @@ export default function Navbar() {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isNotifOpen, setIsNotifOpen] = useState(false);
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
+  const [isCurrencyOpen, setIsCurrencyOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const location = useLocation();
   const navigate = useNavigate();
+  const { displayCurrency, setDisplayCurrency, rates, loadRates } = useCurrencyStore();
+
+  useEffect(() => {
+    loadRates();
+  }, [loadRates]);
 
   useEffect(() => {
     if (user) {
@@ -126,6 +133,44 @@ export default function Navbar() {
                     <MessageSquare className="w-5 h-5" />
                   </button>
                 </Link>
+
+                {/* Currency Selector */}
+                <div className="relative">
+                  <button
+                    className="flex items-center gap-1 px-2 py-1.5 rounded-lg text-xs font-semibold transition-all"
+                    style={{ background: 'rgba(240,184,0,0.10)', border: '1px solid rgba(240,184,0,0.22)', color: '#7A5000' }}
+                    onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'rgba(240,184,0,0.18)'; }}
+                    onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'rgba(240,184,0,0.10)'; }}
+                    onClick={() => { setIsCurrencyOpen(!isCurrencyOpen); setIsNotifOpen(false); setIsUserMenuOpen(false); }}
+                  >
+                    <DollarSign className="w-3 h-3" />
+                    <span>{displayCurrency}</span>
+                    <ChevronDown className="w-2.5 h-2.5" />
+                  </button>
+
+                  {isCurrencyOpen && (
+                    <div className="absolute right-0 top-full mt-2 w-40 rounded-2xl z-50 overflow-hidden" style={{
+                      background: 'rgba(255,253,240,0.98)',
+                      border: '1px solid rgba(240,184,0,0.28)',
+                      backdropFilter: 'blur(24px)',
+                      boxShadow: '0 12px 48px rgba(180,130,0,0.18)',
+                    }}>
+                      <div className="py-1.5 max-h-64 overflow-y-auto">
+                        {SUPPORTED_CURRENCIES.map(c => (
+                          <button key={c.code} onClick={() => { setDisplayCurrency(c.code); setIsCurrencyOpen(false); }}
+                            className="w-full flex items-center gap-2 px-4 py-2 text-xs transition-colors"
+                            style={{ color: displayCurrency === c.code ? '#C68000' : '#4A3000', background: displayCurrency === c.code ? 'rgba(240,184,0,0.10)' : 'transparent' }}
+                            onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'rgba(240,184,0,0.08)'; }}
+                            onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = displayCurrency === c.code ? 'rgba(240,184,0,0.10)' : 'transparent'; }}>
+                            <span className="w-5 text-center font-medium">{c.symbol}</span>
+                            <span className="flex-1 text-left font-medium">{c.code}</span>
+                            <span className="text-[10px]" style={{ color: '#9A7C40' }}>{c.label.split(' ')[0]}</span>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
 
                 {/* Notifications */}
                 <div className="relative">

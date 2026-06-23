@@ -10,6 +10,7 @@ import { Button } from '@/components/ui/button';
 import { fetchListingById, toggleFavorite, getOrCreateConversation } from '@/lib/api';
 import { useAuth } from '@/hooks/useAuth';
 import { formatCurrency, formatDate, getInitials, cn } from '@/lib/utils';
+import { useCurrencyStore } from '@/lib/currencyStore';
 import { MOCK_LISTINGS } from '@/lib/mockData';
 import { supabase } from '@/lib/supabase';
 import type { Listing } from '@/types';
@@ -38,6 +39,7 @@ export default function ListingDetail() {
   const [escrowLoading, setEscrowLoading] = useState(false);
   const [paymentSettings, setPaymentSettings] = useState<{ cryptoAddress: string; cryptoNetwork: string } | null>(null);
   const [userStatus, setUserStatus] = useState<'active' | 'blocked' | 'restricted'>('active');
+  const { displayCurrency, formatConverted, ratesLoaded } = useCurrencyStore();
 
   useEffect(() => {
     // Fetch active payment settings for the escrow modal
@@ -303,9 +305,18 @@ export default function ListingDetail() {
             {/* Price card */}
             <div className="bg-white rounded-2xl border border-border p-6 sticky top-24">
               <div className="flex items-start justify-between mb-1">
-                <p className="text-3xl font-heading font-bold text-[hsl(var(--brand-navy))]">
-                  {formatCurrency(listing.price, listing.currency)}
-                </p>
+                <div>
+                  <p className="text-3xl font-heading font-bold text-[hsl(var(--brand-navy))]">
+                    {listing.currency && displayCurrency !== listing.currency
+                      ? formatConverted(listing.price, listing.currency)
+                      : formatCurrency(listing.price, listing.currency)}
+                  </p>
+                  {listing.currency && displayCurrency !== listing.currency && (
+                    <p className="text-sm font-medium mt-1" style={{ color: '#9A7C40' }}>
+                      {formatCurrency(listing.price, listing.currency)} {listing.currency}
+                    </p>
+                  )}
+                </div>
                 <div className="flex gap-2">
                   <button onClick={handleFavorite}
                     className={`w-9 h-9 rounded-full border flex items-center justify-center transition-colors ${isFav ? 'bg-rose-50 border-rose-200 text-rose-500' : 'border-border text-muted-foreground hover:text-rose-500'}`}>

@@ -16,6 +16,8 @@ router.get('/:conversationId', async (req: AuthRequest, res) => {
       id: m.id, conversationId: m.conversation_id, senderId: m.sender_id,
       senderName: m.sender_name || 'Unknown', content: m.content,
       createdAt: m.created_at, isRead: m.is_read,
+      imageUrl: m.image_url || null, fileUrl: m.file_url || null,
+      fileName: m.file_name || null, fileSize: m.file_size || null,
     })));
   } catch (err: any) {
     res.status(500).json({ error: err.message });
@@ -25,11 +27,13 @@ router.get('/:conversationId', async (req: AuthRequest, res) => {
 // POST /api/messages
 router.post('/', async (req: AuthRequest, res) => {
   try {
-    const { conversationId, content, isBuyer } = req.body;
+    const { conversationId, content, isBuyer, imageUrl, fileUrl, fileName, fileSize } = req.body;
     const id = uuid();
     const result = await pool.query(
-      `INSERT INTO messages (id, conversation_id, sender_id, content)
-       VALUES ($1,$2,$3,$4) RETURNING *`, [id, conversationId, req.userId, content]);
+      `INSERT INTO messages (id, conversation_id, sender_id, content, image_url, file_url, file_name, file_size)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING *`,
+      [id, conversationId, req.userId, content,
+       imageUrl || null, fileUrl || null, fileName || null, fileSize || null]);
 
     // Update conversation
     const unreadField = isBuyer ? 'seller_unread' : 'buyer_unread';
@@ -43,6 +47,8 @@ router.post('/', async (req: AuthRequest, res) => {
       id: m.id, conversationId: m.conversation_id, senderId: m.sender_id,
       senderName: user.rows[0]?.username || 'Unknown', content: m.content,
       createdAt: m.created_at, isRead: m.is_read,
+      imageUrl: m.image_url || null, fileUrl: m.file_url || null,
+      fileName: m.file_name || null, fileSize: m.file_size || null,
     });
   } catch (err: any) {
     res.status(500).json({ error: err.message });

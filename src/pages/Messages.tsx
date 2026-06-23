@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useNavigate, useSearchParams, Link } from 'react-router-dom';
 import {
   Send, MessageSquare, Search, ArrowLeft, Package,
-  ChevronRight, ShieldCheck
+  ChevronRight, ShieldCheck, Image as ImageIcon, Paperclip, X, Loader2
 } from 'lucide-react';
 import Navbar from '@/components/layout/Navbar';
 import { Button } from '@/components/ui/button';
@@ -10,6 +10,8 @@ import { useAuth } from '@/hooks/useAuth';
 import {
   fetchConversations, fetchMessages, sendMessage, markConversationRead
 } from '@/lib/api';
+import { useSocket } from '@/hooks/useSocket';
+import { storage } from '@/lib/client';
 import { formatRelativeTime, formatDateTime, getInitials } from '@/lib/utils';
 import type { Message } from '@/types';
 import { toast } from 'sonner';
@@ -42,8 +44,49 @@ export default function Messages() {
   const [sending, setSending] = useState(false);
   const [search, setSearch] = useState('');
   const [showSidebar, setShowSidebar] = useState(true);
+  const [uploadingFile, setUploadingFile] = useState(false);
+  const [filePreview, setFilePreview] = useState<{ file: File; preview: string } | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  const socket = useSocket({
+    userId: user?.id,
+    username: user?.username,
+    token: localStorage.getItem('auth_token') || undefined,
+    conversationId: activeConvId,
+    onNewMessage: (msg) => {
+      setMessages(prev => {
+        if (prev.some(m => m.id === msg.id)) return prev;
+        scrollToBottom();
+        const mapped: Message = {
+          id: msg.id,
+          conversationId: msg.conversationId,
+          senderId: msg.senderId,
+          senderName: msg.senderName,
+          content: msg.content,
+          imageUrl: msg.imageUrl,
+          fileUrl: msg.fileUrl,
+          fileName: msg.fileName,
+          fileSize: msg.fileSize,
+          createdAt: msg.createdAt,
+          isRead: msg.isRead,
+        };
+        return [...prev, mapped];
+      });
+      // Update conversation list
+      setConversations(prev => prev.map(c =>
+        c.id === msg.conversationId
+          ? { ...c, lastMessage: msg.content.substring(0, 100), lastMessageAt: msg.createdAt }
+          : c
+      ));
+    },
+    onConversationRead: (data) => {
+      setConversations(prev => prev.map(c =>
+        c.id === data.conversationId ? { ...c, unreadCount: 0 } : c
+      ));
+    },
+  });
 
   useEffect(() => {
     if (!authLoading && !user) navigate('/login');
@@ -77,22 +120,7 @@ export default function Messages() {
       .catch(() => toast.error('Failed to load messages'))
       .finally(() => setMsgsLoading(false));
 
-    // Polling every 4 seconds
-    if (pollRef.current) clearInterval(pollRef.current);
-    pollRef.current = setInterval(() => {
-      fetchMessages(activeConvId).then(msgs => {
-        setMessages(prev => {
-          if (prev.length !== msgs.length) {
-            scrollToBottom();
-            return msgs;
-          }
-          return prev;
-        });
-      }).catch(() => {});
-    }, 4000);
-
-    return () => { if (pollRef.current) clearInterval(pollRef.current); };
-  }, [activeConvId, user]); // eslint-disable-line react-hooks/exhaustive-deps
+    }, [activeConvId, user]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const scrollToBottom = () => {
     setTimeout(() => messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }), 100);
@@ -100,40 +128,78 @@ export default function Messages() {
 
   const handleSend = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newMessage.trim() || !activeConvId || !user || sending) return;
+    if (!activeConvId || !user || sending) return;
     const content = newMessage.trim();
-    setNewMessage('');
-    setSending(true);
+    if (!content && !filePreview) return;
 
     const conv = conversations.find(c => c.id === activeConvId);
     const isBuyer = conv?.buyerId === user.id;
 
-    // Optimistic update
-    const optimistic: Message = {
-      id: `opt-${Date.now()}`,
-      conversationId: activeConvId,
-      senderId: user.id,
-      senderName: user.username,
-      content,
-      createdAt: new Date().toISOString(),
-      isRead: false,
-    };
-    setMessages(prev => [...prev, optimistic]);
-    scrollToBottom();
+    // Upload file if present
+    let imageUrl: string | undefined;
+    let fileUrl: string | undefined;
+    let fileName: string | undefined;
+    let fileSize: number | undefined;
 
-    try {
-      const sent = await sendMessage(activeConvId, user.id, content, isBuyer ?? true);
-      setMessages(prev => prev.map(m => m.id === optimistic.id ? sent : m));
-      setConversations(prev => prev.map(c =>
-        c.id === activeConvId ? { ...c, lastMessage: content, lastMessageAt: new Date().toISOString() } : c
-      ));
-    } catch {
-      toast.error('Failed to send message');
-      setMessages(prev => prev.filter(m => m.id !== optimistic.id));
-      setNewMessage(content);
-    } finally {
-      setSending(false);
+    if (filePreview) {
+      setUploadingFile(true);
+      try {
+        const result = await storage.upload(filePreview.file);
+        if (filePreview.file.type.startsWith('image/')) {
+          imageUrl = result.url;
+        } else {
+          fileUrl = result.url;
+        }
+        fileName = filePreview.file.name;
+        fileSize = filePreview.file.size;
+      } catch {
+        toast.error('Failed to upload file');
+        setUploadingFile(false);
+        return;
+      }
+      setUploadingFile(false);
+      setFilePreview(null);
     }
+
+    setNewMessage('');
+    setSending(true);
+
+    socket.sendMessage({
+      conversationId: activeConvId,
+      content: content || '(file)',
+      isBuyer: isBuyer ?? true,
+      imageUrl,
+      fileUrl,
+      fileName,
+      fileSize,
+    });
+
+    setConversations(prev => prev.map(c =>
+      c.id === activeConvId ? { ...c, lastMessage: content || '(file)', lastMessageAt: new Date().toISOString() } : c
+    ));
+
+    setSending(false);
+  };
+
+  const handleFilePick = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 10 * 1024 * 1024) {
+      toast.error('File must be under 10MB');
+      return;
+    }
+    const preview = URL.createObjectURL(file);
+    setFilePreview({ file, preview });
+    if (fileInputRef.current) fileInputRef.current.value = '';
+  };
+
+  const handleTyping = () => {
+    if (!activeConvId) return;
+    socket.sendTypingStart(activeConvId);
+    if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+    typingTimeoutRef.current = setTimeout(() => {
+      socket.sendTypingStop(activeConvId);
+    }, 2000);
   };
 
   const activeConv = conversations.find(c => c.id === activeConvId);
@@ -320,6 +386,20 @@ export default function Messages() {
                                 </div>
                               )}
                               <div className={`max-w-[70%] group`}>
+                                {(msg as any).imageUrl && (
+                                  <div className={`mb-1.5 rounded-xl overflow-hidden border ${isOwn ? 'border-white/20' : 'border-border'}`}>
+                                    <img src={(msg as any).imageUrl} alt="Shared image"
+                                      className="w-full max-h-48 object-cover cursor-pointer"
+                                      onClick={() => window.open((msg as any).imageUrl, '_blank')} />
+                                  </div>
+                                )}
+                                {(msg as any).fileUrl && (
+                                  <a href={(msg as any).fileUrl} target="_blank" rel="noopener noreferrer"
+                                    className={`flex items-center gap-2 mb-1.5 px-3 py-2 rounded-xl text-xs transition-colors ${isOwn ? 'bg-white/10 hover:bg-white/20 text-white' : 'bg-muted hover:bg-muted/80 text-foreground'}`}>
+                                    <Paperclip className="w-3.5 h-3.5 flex-shrink-0" />
+                                    <span className="truncate flex-1">{(msg as any).fileName || 'Download file'}</span>
+                                  </a>
+                                )}
                                 <div className={`px-3.5 py-2.5 rounded-2xl text-sm leading-relaxed ${isOwn
                                   ? 'bg-[hsl(var(--brand-navy))] text-white rounded-br-md'
                                   : 'bg-muted text-foreground rounded-bl-md'
@@ -335,16 +415,55 @@ export default function Messages() {
                         );
                       })}
                       <div ref={messagesEndRef} />
+                      {/* Typing indicator */}
+                      {Object.keys(socket.typingUsers).length > 0 && (
+                        <div className="flex items-center gap-2 text-xs text-muted-foreground italic">
+                          <div className="flex gap-0.5">
+                            <span className="w-1.5 h-1.5 rounded-full bg-muted-foreground/40 animate-bounce" style={{ animationDelay: '0ms' }} />
+                            <span className="w-1.5 h-1.5 rounded-full bg-muted-foreground/40 animate-bounce" style={{ animationDelay: '150ms' }} />
+                            <span className="w-1.5 h-1.5 rounded-full bg-muted-foreground/40 animate-bounce" style={{ animationDelay: '300ms' }} />
+                          </div>
+                          <span>Typing...</span>
+                        </div>
+                      )}
                     </>
                   )}
                 </div>
 
                 {/* Input */}
                 <div className="px-4 py-3 border-t border-border">
+                  {/* File Preview */}
+                  {filePreview && (
+                    <div className="flex items-center gap-2 mb-2 px-3 py-2 bg-muted/50 rounded-xl border border-border">
+                      <div className="w-10 h-10 rounded-lg overflow-hidden bg-white flex items-center justify-center flex-shrink-0">
+                        {filePreview.file.type.startsWith('image/') ? (
+                          <img src={filePreview.preview} alt="" className="w-full h-full object-cover" />
+                        ) : (
+                          <Paperclip className="w-5 h-5 text-muted-foreground" />
+                        )}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-xs font-medium text-foreground truncate">{filePreview.file.name}</p>
+                        <p className="text-[11px] text-muted-foreground">{(filePreview.file.size / 1024).toFixed(1)} KB</p>
+                      </div>
+                      <button onClick={() => { setFilePreview(null); URL.revokeObjectURL(filePreview.preview); }}
+                        className="p-1 text-muted-foreground hover:text-foreground">
+                        <X className="w-4 h-4" />
+                      </button>
+                    </div>
+                  )}
+
                   <form onSubmit={handleSend} className="flex items-end gap-2">
+                    {/* File picker button */}
+                    <button type="button" onClick={() => fileInputRef.current?.click()}
+                      className="w-10 h-10 flex items-center justify-center rounded-xl border border-border text-muted-foreground hover:text-foreground hover:bg-muted transition-all flex-shrink-0">
+                      <Paperclip className="w-4 h-4" />
+                    </button>
+                    <input ref={fileInputRef} type="file" accept="image/*,.pdf,.doc,.docx,.txt" className="hidden" onChange={handleFilePick} />
+
                     <textarea
                       value={newMessage}
-                      onChange={e => setNewMessage(e.target.value)}
+                      onChange={e => { setNewMessage(e.target.value); handleTyping(); }}
                       onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend(e); } }}
                       placeholder="Type a message… (Enter to send)"
                       rows={1}
@@ -353,10 +472,10 @@ export default function Messages() {
                     />
                     <Button
                       type="submit"
-                      disabled={!newMessage.trim() || sending}
+                      disabled={(!newMessage.trim() && !filePreview) || sending || uploadingFile}
                       className="w-11 h-11 p-0 navy-gradient text-white border-0 hover:opacity-90 flex-shrink-0 rounded-xl"
                     >
-                      <Send className="w-4 h-4" />
+                      {uploadingFile ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
                     </Button>
                   </form>
                 </div>

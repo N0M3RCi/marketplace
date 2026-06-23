@@ -4,10 +4,10 @@
   "version": "1.0.0",
   "type": "module",
   "scripts": {
-    "dev": "tsx watch src/index.ts",
-    "start": "tsx src/index.ts",
-    "migrate": "tsx src/migrate.ts",
-    "seed": "tsx src/seed.ts"
+    "dev": "PORT=3001 tsx watch src/index.ts",
+    "start": "PORT=3001 tsx src/index.ts",
+    "migrate": "PORT=3001 tsx src/migrate.ts",
+    "seed": "PORT=3001 tsx src/seed.ts"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",
@@ -16,6 +16,8 @@
     "jsonwebtoken": "^9.0.2",
     "multer": "^1.4.5-lts.1",
     "pg": "^8.13.0",
+    "socket.io": "^4.8.3",
+    "socket.io-client": "^4.8.3",
     "uuid": "^10.0.0"
   },
   "devDependencies": {

@@ -205,3 +205,11 @@ export const admin = {
       request(`/api/admin/seller-requests/${id}/reject`, { method: 'PUT', body: JSON.stringify({ notes }) }),
   },
 };
+
+// Currency / exchange rates
+export const currency = {
+  rates: (): Promise<{ base: string; rates: Record<string, number> }> =>
+    request('/api/currency/rates'),
+  convert: (amount: number, from = 'USD', to = 'USD'): Promise<{ amount: number; from: string; to: string; rate: number }> =>
+    request(`/api/currency/convert?amount=${amount}&from=${from}&to=${to}`),
+};

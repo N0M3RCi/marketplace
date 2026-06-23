@@ -11,6 +11,7 @@ import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/hooks/useAuth';
 import { formatCurrency, formatDateTime, formatDate, cn } from '@/lib/utils';
 import { ESCROW_STATUS_CONFIG, DISPUTE_REASONS } from '@/constants';
+import { generateQR, getNetworkSymbol } from '@/lib/qr';
 import { toast } from 'sonner';
 import type { EscrowStatus } from '@/types';
 
@@ -97,6 +98,7 @@ export default function EscrowCaseDetail() {
   const [paymentForm, setPaymentForm] = useState({ txHash: '', amountSent: '', method: 'crypto' });
   const [paymentProofFile, setPaymentProofFile] = useState<File | null>(null);
   const [showPaymentForm, setShowPaymentForm] = useState(false);
+  const [qrDataUrl, setQrDataUrl] = useState<string | null>(null);
 
   // Seller evidence form
   const [showEvidenceForm, setShowEvidenceForm] = useState(false);
@@ -185,6 +187,15 @@ export default function EscrowCaseDetail() {
     setLoading(true);
     fetchCase().finally(() => setLoading(false));
   }, [id, user]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Generate QR code dynamically when payment address is available
+  useEffect(() => {
+    if (paymentAddress?.cryptoAddress) {
+      generateQR(paymentAddress.cryptoAddress).then(setQrDataUrl);
+    } else {
+      setQrDataUrl(null);
+    }
+  }, [paymentAddress?.cryptoAddress]);
 
   const copyAddress = () => {
     if (paymentAddress) {
@@ -445,8 +456,13 @@ export default function EscrowCaseDetail() {
                     </div>
 
                     <div className="flex gap-3 mb-4">
-                      {paymentAddress.qrCodeUrl && (
-                        <img src={paymentAddress.qrCodeUrl} alt="QR" className="w-24 h-24 rounded-xl border border-border bg-white p-1 flex-shrink-0" />
+                      {(paymentAddress.qrCodeUrl || qrDataUrl) && (
+                        <img src={qrDataUrl || paymentAddress.qrCodeUrl} alt="QR" className="w-24 h-24 rounded-xl border border-border bg-white p-1 flex-shrink-0" />
+                      )}
+                      {!paymentAddress.qrCodeUrl && !qrDataUrl && paymentAddress.cryptoAddress && (
+                        <div className="w-24 h-24 rounded-xl border border-border bg-muted flex items-center justify-center flex-shrink-0">
+                          <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
+                        </div>
                       )}
                       <div className="flex-1 min-w-0">
                         <p className="text-[11px] text-muted-foreground mb-1.5 font-semibold uppercase tracking-wider">Wallet Address</p>

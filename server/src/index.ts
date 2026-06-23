@@ -1,6 +1,7 @@
 import express from 'express';
 import cors from 'cors';
 import path from 'path';
+import http from 'http';
 import { fileURLToPath } from 'url';
 import pool from './db.js';
 import { authMiddleware } from './middleware/auth.js';
@@ -13,23 +14,37 @@ import favoritesRoutes from './routes/favorites.js';
 import notificationsRoutes from './routes/notifications.js';
 import escrowRoutes from './routes/escrow.js';
 import walletRoutes from './routes/wallets.js';
-import storageRoutes from './routes/storage.js';
+import storageRoutes, { fileRouter as storageFileRouter } from './routes/storage.js';
 import profileRoutes from './routes/profile.js';
 import reviewsRoutes from './routes/reviews.js';
 import sellerRequestRoutes from './routes/sellerRequests.js';
+import currencyRoutes from './routes/currency.js';
 import adminRoutes from './routes/admin/index.js';
+import { setupSocket } from './socket.js';
 
 const app = express();
-const PORT = parseInt(process.env.PORT || '3000', 10);
+// Use port 3001 as default (Vite dev server uses 3000)
+const PORT = parseInt(process.env.PORT || '3001', 10);
 
 // Middleware
 app.use(cors());
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 
+// JSON body parser error handler (malformed JSON → readable 400)
+app.use((err: any, _req: express.Request, res: express.Response, next: express.NextFunction) => {
+  if (err instanceof SyntaxError && 'body' in err) {
+    res.status(400).json({ error: 'Invalid JSON in request body' });
+    return;
+  }
+  next(err);
+});
+
 // API routes (no auth required)
 app.use('/api/auth', authRoutes);
 app.use('/api/categories', categoriesRoutes);
+app.use('/api/currency', currencyRoutes);
+app.use('/api/storage/file', storageFileRouter); // Public file retrieval (for chat images/files)
 
 // API routes (auth required)
 app.use('/api/listings', listingsRoutes);
@@ -39,15 +54,29 @@ app.use('/api/messages', authMiddleware, messagesRoutes);
 app.use('/api/notifications', authMiddleware, notificationsRoutes);
 app.use('/api/escrow', authMiddleware, escrowRoutes);
 app.use('/api/wallet', authMiddleware, walletRoutes);
-app.use('/api/storage', authMiddleware, storageRoutes);
+app.use('/api/storage', storageRoutes);
 app.use('/api/profile', authMiddleware, profileRoutes);
 app.use('/api/reviews', authMiddleware, reviewsRoutes);
 app.use('/api/seller-requests', authMiddleware, sellerRequestRoutes);
 app.use('/api/admin', authMiddleware, adminRoutes);
 
-// Health check
-app.get('/api/health', (_req, res) => {
-  res.json({ status: 'ok', timestamp: new Date().toISOString() });
+// Health check (includes database status)
+app.get('/api/health', async (_req, res) => {
+  try {
+    await pool.query('SELECT 1');
+    res.json({ status: 'ok', db: 'connected', timestamp: new Date().toISOString() });
+  } catch {
+    res.status(503).json({ status: 'error', db: 'disconnected', timestamp: new Date().toISOString() });
+  }
+});
+
+// Global error handler — always returns JSON
+app.use((err: any, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
+  console.error('Unhandled error:', err);
+  res.status(err.status || 500).json({
+    error: err.message || 'Internal server error',
+    ...(process.env.NODE_ENV === 'development' ? { stack: err.stack } : {}),
+  });
 });
 
 // Serve frontend static files in production
@@ -83,13 +112,21 @@ async function start() {
       CREATE TABLE IF NOT EXISTS reviews (id UUID PRIMARY KEY DEFAULT gen_random_uuid(), seller_id UUID NOT NULL REFERENCES user_profiles(id), reviewer_id UUID NOT NULL REFERENCES user_profiles(id), rating INTEGER DEFAULT 5, comment TEXT, created_at TIMESTAMPTZ DEFAULT NOW());
       CREATE TABLE IF NOT EXISTS audit_logs (id UUID PRIMARY KEY DEFAULT gen_random_uuid(), admin_id UUID REFERENCES user_profiles(id), admin_name TEXT, action TEXT NOT NULL, entity_type TEXT, entity_id TEXT, details TEXT, ip_address TEXT, created_at TIMESTAMPTZ DEFAULT NOW());
       CREATE TABLE IF NOT EXISTS uploaded_files (id UUID PRIMARY KEY DEFAULT gen_random_uuid(), file_name TEXT NOT NULL, file_type TEXT NOT NULL, file_size INTEGER NOT NULL, file_data TEXT NOT NULL, uploaded_by UUID REFERENCES user_profiles(id), created_at TIMESTAMPTZ DEFAULT NOW());
+      -- Add attachment columns to messages if not exist
+      ALTER TABLE messages ADD COLUMN IF NOT EXISTS image_url TEXT;
+      ALTER TABLE messages ADD COLUMN IF NOT EXISTS file_url TEXT;
+      ALTER TABLE messages ADD COLUMN IF NOT EXISTS file_name TEXT;
+      ALTER TABLE messages ADD COLUMN IF NOT EXISTS file_size INTEGER;
     `);
     console.log('Database tables ensured.');
   } catch (err) {
     console.error('Migration error:', err);
   }
 
-  app.listen(PORT, '0.0.0.0', () => {
+  const httpServer = http.createServer(app);
+  setupSocket(httpServer);
+
+  httpServer.listen(PORT, '0.0.0.0', () => {
     console.log(`Server running on port ${PORT}`);
   });
 }
