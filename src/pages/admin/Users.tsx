@@ -282,27 +282,27 @@ export default function AdminUsers() {
 
   if (loading) return (
     <div className="p-8 flex items-center justify-center min-h-[400px]">
-      <Loader2 className="w-7 h-7 animate-spin" style={{ color: '#FFE000' }} />
+      <Loader2 className="w-7 h-7 animate-spin" style={{ color: '#C68000' }} />
     </div>
   );
 
   return (
-    <div className="p-6 lg:p-8 min-h-screen" style={{ background: '#000000' }}>
+    <div className="p-6 lg:p-8">
       {/* Page Header */}
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="font-heading text-2xl font-bold" style={{ color: 'rgba(255,255,255,0.90)' }}>User Management</h1>
-          <p className="text-sm mt-1" style={{ color: 'rgba(255,255,255,0.40)' }}>{users.length} registered users · {pendingRequests.length} pending seller requests</p>
+          <h1 className="font-heading text-2xl font-bold" style={{ color: '#2A1A00' }}>User Management</h1>
+          <p className="text-sm mt-1" style={{ color: '#9A7C40' }}>{users.length} registered users · {pendingRequests.length} pending seller requests</p>
         </div>
         <button onClick={handleRefresh} disabled={refreshing}
           className="p-2 rounded-lg transition-colors"
-          style={{ border: '1px solid rgba(255,255,255,0.10)', color: 'rgba(255,255,255,0.50)' }}>
+          style={{ border: '1px solid rgba(200,160,60,0.15)', color: '#9A7C40' }}>
           <RefreshCw className={cn('w-4 h-4', refreshing && 'animate-spin')} />
         </button>
       </div>
 
       {/* Tabs */}
-      <div className="flex items-center gap-0 mb-6" style={{ borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
+      <div className="flex items-center gap-0 mb-6" style={{ borderBottom: '1px solid rgba(200,160,60,0.12)' }}>
         {[
           { key: 'users', label: 'All Users', count: users.length },
           { key: 'seller-requests', label: 'Seller Requests', count: pendingRequests.length },
@@ -312,14 +312,14 @@ export default function AdminUsers() {
             onClick={() => setActiveTab(tab.key as any)}
             className="flex items-center gap-2 px-4 py-2.5 text-sm font-medium transition-colors relative"
             style={activeTab === tab.key
-              ? { color: '#FFE000', borderBottom: '2px solid #FFE000', marginBottom: '-1px' }
-              : { color: 'rgba(255,255,255,0.42)' }}>
+              ? { color: '#C68000', borderBottom: '2px solid #C68000', marginBottom: '-1px' }
+              : { color: '#9A7C40' }}>
             {tab.label}
             {tab.count > 0 && (
               <span className="text-[10px] px-1.5 py-0.5 rounded-full font-bold"
                 style={tab.key === 'seller-requests' && pendingRequests.length > 0
                   ? { background: 'rgba(239,68,68,0.20)', color: 'rgba(252,165,165,0.90)' }
-                  : { background: 'rgba(255,224,0,0.15)', color: '#FFE000' }}>
+                  : { background: 'rgba(200,160,60,0.15)', color: '#C68000' }}>
                 {tab.count}
               </span>
             )}
@@ -331,35 +331,35 @@ export default function AdminUsers() {
       {activeTab === 'seller-requests' && (
         <div>
           <div className="mb-4">
-            <h2 className="font-heading text-lg font-bold" style={{ color: 'rgba(255,255,255,0.90)' }}>Seller Role Requests</h2>
-            <p className="text-sm mt-0.5" style={{ color: 'rgba(255,255,255,0.40)' }}>Review users requesting seller access on the platform</p>
+            <h2 className="font-heading text-lg font-bold" style={{ color: '#2A1A00' }}>Seller Role Requests</h2>
+            <p className="text-sm mt-0.5" style={{ color: '#9A7C40' }}>Review users requesting seller access on the platform</p>
           </div>
           {requestsLoading ? (
             <div className="flex items-center justify-center py-16">
-              <Loader2 className="w-6 h-6 animate-spin" style={{ color: '#FFE000' }} />
+              <Loader2 className="w-6 h-6 animate-spin" style={{ color: '#C68000' }} />
             </div>
           ) : sellerRequests.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-20 rounded-xl" style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)' }}>
-              <Store className="w-10 h-10 mb-3 opacity-20" style={{ color: 'rgba(255,255,255,0.50)' }} />
-              <p className="text-sm" style={{ color: 'rgba(255,255,255,0.40)' }}>No seller requests yet</p>
-              <p className="text-xs mt-1" style={{ color: 'rgba(255,255,255,0.25)' }}>Requests appear here when users apply to become sellers</p>
+            <div className="flex flex-col items-center justify-center py-20 rounded-xl" style={{ background: 'rgba(200,160,60,0.06)', border: '1px solid rgba(200,160,60,0.12)' }}>
+              <Store className="w-10 h-10 mb-3 opacity-20" style={{ color: '#9A7C40' }} />
+              <p className="text-sm" style={{ color: '#9A7C40' }}>No seller requests yet</p>
+              <p className="text-xs mt-1" style={{ color: '#C8B090' }}>Requests appear here when users apply to become sellers</p>
             </div>
           ) : (
             <div className="space-y-3">
               {sellerRequests.map(req => (
                 <div key={req.id} className="rounded-xl p-5" style={{
-                  background: req.status === 'pending' ? 'rgba(255,255,255,0.05)' : 'rgba(255,255,255,0.03)',
-                  border: req.status === 'pending' ? '1px solid rgba(255,224,0,0.18)' : '1px solid rgba(255,255,255,0.07)',
+                  background: req.status === 'pending' ? 'rgba(200,160,60,0.08)' : 'rgba(200,160,60,0.05)',
+                  border: req.status === 'pending' ? '1px solid rgba(200,160,60,0.18)' : '1px solid rgba(200,160,60,0.10)',
                 }}>
                   <div className="flex items-start justify-between gap-4 flex-wrap">
                     <div className="flex items-center gap-3">
                       <div className="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 font-bold text-sm"
-                        style={{ background: 'rgba(255,224,0,0.15)', color: '#FFE000' }}>
+                        style={{ background: 'rgba(200,160,60,0.15)', color: '#C68000' }}>
                         {req.username.charAt(0).toUpperCase()}
                       </div>
                       <div>
                         <div className="flex items-center gap-2 flex-wrap">
-                          <p className="font-semibold text-sm" style={{ color: 'rgba(255,255,255,0.88)' }}>{req.username}</p>
+                          <p className="font-semibold text-sm" style={{ color: '#2A1A00' }}>{req.username}</p>
                           <span className="text-[10px] px-1.5 py-0.5 rounded-full font-medium bg-blue-100 text-blue-700 capitalize">{req.currentRole}</span>
                           <span className="text-[10px] px-1.5 py-0.5 rounded-full font-medium capitalize"
                             style={req.status === 'pending'
@@ -370,11 +370,11 @@ export default function AdminUsers() {
                             {req.status}
                           </span>
                         </div>
-                        <p className="text-xs" style={{ color: 'rgba(255,255,255,0.40)' }}>{req.email}</p>
+                        <p className="text-xs" style={{ color: '#9A7C40' }}>{req.email}</p>
                         {req.reason && (
-                          <p className="text-xs mt-1.5 italic" style={{ color: 'rgba(255,255,255,0.55)' }}>"{req.reason}"</p>
+                          <p className="text-xs mt-1.5 italic" style={{ color: '#9A7C40' }}>"{req.reason}"</p>
                         )}
-                        <p className="text-[11px] mt-1" style={{ color: 'rgba(255,255,255,0.28)' }}>{formatDate(req.createdAt)}</p>
+                        <p className="text-[11px] mt-1" style={{ color: '#B8A070' }}>{formatDate(req.createdAt)}</p>
                       </div>
                     </div>
                     {req.status === 'pending' && (
@@ -423,9 +423,9 @@ export default function AdminUsers() {
                 { label: 'Restricted',   value: stats.restricted, highlight: stats.restricted > 0 },
               ].map(s => (
                 <div key={s.label} className="rounded-xl p-4"
-                  style={{ background: 'rgba(255,255,255,0.04)', border: s.highlight ? '1px solid rgba(239,68,68,0.25)' : '1px solid rgba(255,255,255,0.08)' }}>
-                  <p className="font-bold text-xl font-heading" style={{ color: s.highlight ? 'rgba(252,165,165,0.90)' : '#FFE000' }}>{s.value}</p>
-                  <p className="text-xs mt-0.5" style={{ color: 'rgba(255,255,255,0.40)' }}>{s.label}</p>
+                  style={{ background: 'rgba(200,160,60,0.06)', border: s.highlight ? '1px solid rgba(239,68,68,0.25)' : '1px solid rgba(200,160,60,0.12)' }}>
+                  <p className="font-bold text-xl font-heading" style={{ color: s.highlight ? 'rgba(252,165,165,0.90)' : '#C68000' }}>{s.value}</p>
+                  <p className="text-xs mt-0.5" style={{ color: '#9A7C40' }}>{s.label}</p>
                 </div>
               ))}
             </div>
@@ -433,32 +433,32 @@ export default function AdminUsers() {
             {/* Filters */}
             <div className="flex flex-col sm:flex-row gap-3 mb-5">
               <div className="relative flex-1 max-w-sm">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4" style={{ color: 'rgba(255,255,255,0.30)' }} />
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4" style={{ color: '#B8A070' }} />
                 <input type="text" placeholder="Search by name or email..."
                   value={search} onChange={e => setSearch(e.target.value)}
                   className="w-full pl-9 pr-3 py-2.5 text-sm rounded-lg focus:outline-none focus:ring-1 transition-all"
-                  style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.10)', color: 'rgba(255,255,255,0.85)' }} />
+                  style={{ background: 'rgba(200,160,60,0.10)', border: '1px solid rgba(200,160,60,0.15)', color: '#4A3010' }} />
               </div>
               <div className="flex items-center gap-1 flex-wrap">
-                <span className="text-xs mr-1" style={{ color: 'rgba(255,255,255,0.35)' }}>Role:</span>
+                <span className="text-xs mr-1" style={{ color: '#B8A070' }}>Role:</span>
                 {['all', 'admin', 'buyer', 'seller', 'both'].map(r => (
                   <button key={r} onClick={() => setRoleFilter(r)}
                     className="px-2.5 py-1.5 text-xs font-medium rounded-lg capitalize transition-colors"
                     style={roleFilter === r
-                      ? { background: 'rgba(255,224,0,0.18)', border: '1px solid rgba(255,224,0,0.35)', color: '#FFE000' }
-                      : { color: 'rgba(255,255,255,0.42)' }}>
+                      ? { background: 'rgba(200,160,60,0.18)', border: '1px solid rgba(200,160,60,0.35)', color: '#C68000' }
+                      : { color: '#9A7C40' }}>
                     {r}
                   </button>
                 ))}
               </div>
               <div className="flex items-center gap-1 flex-wrap">
-                <span className="text-xs mr-1" style={{ color: 'rgba(255,255,255,0.35)' }}>Status:</span>
+                <span className="text-xs mr-1" style={{ color: '#B8A070' }}>Status:</span>
                 {['all', 'active', 'restricted', 'blocked'].map(s => (
                   <button key={s} onClick={() => setStatusFilter(s)}
                     className="px-2.5 py-1.5 text-xs font-medium rounded-lg capitalize transition-colors"
                     style={statusFilter === s
-                      ? { background: 'rgba(255,224,0,0.18)', border: '1px solid rgba(255,224,0,0.35)', color: '#FFE000' }
-                      : { color: 'rgba(255,255,255,0.42)' }}>
+                      ? { background: 'rgba(200,160,60,0.18)', border: '1px solid rgba(200,160,60,0.35)', color: '#C68000' }
+                      : { color: '#9A7C40' }}>
                     {s}
                   </button>
                 ))}
@@ -466,23 +466,23 @@ export default function AdminUsers() {
             </div>
 
             {/* Table */}
-            <div className="rounded-xl overflow-hidden" style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)' }}>
+            <div className="rounded-xl overflow-hidden" style={{ background: 'rgba(200,160,60,0.06)', border: '1px solid rgba(200,160,60,0.12)' }}>
               {filtered.length === 0 ? (
                 <div className="py-16 text-center">
-                  <User className="w-10 h-10 mx-auto mb-3 opacity-20" style={{ color: 'rgba(255,255,255,0.50)' }} />
-                  <p className="text-sm" style={{ color: 'rgba(255,255,255,0.40)' }}>No users found</p>
+                  <User className="w-10 h-10 mx-auto mb-3 opacity-20" style={{ color: '#9A7C40' }} />
+                  <p className="text-sm" style={{ color: '#9A7C40' }}>No users found</p>
                 </div>
               ) : (
                 <div className="overflow-x-auto">
                   <table className="w-full text-sm">
                     <thead>
-                      <tr style={{ borderBottom: '1px solid rgba(255,255,255,0.07)', background: 'rgba(255,255,255,0.03)' }}>
-                        <th className="text-left px-5 py-3 text-xs font-semibold uppercase tracking-wider" style={{ color: 'rgba(255,255,255,0.40)' }}>User</th>
-                        <th className="text-left px-4 py-3 text-xs font-semibold uppercase tracking-wider" style={{ color: 'rgba(255,255,255,0.40)' }}>Role</th>
-                        <th className="text-left px-4 py-3 text-xs font-semibold uppercase tracking-wider" style={{ color: 'rgba(255,255,255,0.40)' }}>Status</th>
-                        <th className="text-left px-4 py-3 text-xs font-semibold uppercase tracking-wider hidden lg:table-cell" style={{ color: 'rgba(255,255,255,0.40)' }}>Tx / Rating</th>
-                        <th className="text-left px-4 py-3 text-xs font-semibold uppercase tracking-wider hidden md:table-cell" style={{ color: 'rgba(255,255,255,0.40)' }}>Joined</th>
-                        <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wider text-right" style={{ color: 'rgba(255,255,255,0.40)' }}>Actions</th>
+                      <tr style={{ borderBottom: '1px solid rgba(200,160,60,0.10)', background: 'rgba(200,160,60,0.05)' }}>
+                        <th className="text-left px-5 py-3 text-xs font-semibold uppercase tracking-wider" style={{ color: '#9A7C40' }}>User</th>
+                        <th className="text-left px-4 py-3 text-xs font-semibold uppercase tracking-wider" style={{ color: '#9A7C40' }}>Role</th>
+                        <th className="text-left px-4 py-3 text-xs font-semibold uppercase tracking-wider" style={{ color: '#9A7C40' }}>Status</th>
+                        <th className="text-left px-4 py-3 text-xs font-semibold uppercase tracking-wider hidden lg:table-cell" style={{ color: '#9A7C40' }}>Tx / Rating</th>
+                        <th className="text-left px-4 py-3 text-xs font-semibold uppercase tracking-wider hidden md:table-cell" style={{ color: '#9A7C40' }}>Joined</th>
+                        <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wider text-right" style={{ color: '#9A7C40' }}>Actions</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -496,11 +496,11 @@ export default function AdminUsers() {
                             onClick={() => openEditPanel(u)}
                             className="cursor-pointer group transition-colors"
                             style={{
-                              borderBottom: '1px solid rgba(255,255,255,0.05)',
-                              background: isSelected ? 'rgba(255,224,0,0.05)' : 'transparent',
-                              borderLeft: isSelected ? '2px solid rgba(255,224,0,0.55)' : '2px solid transparent',
+                              borderBottom: '1px solid rgba(200,160,60,0.08)',
+                              background: isSelected ? 'rgba(200,160,60,0.08)' : 'transparent',
+                              borderLeft: isSelected ? '2px solid rgba(200,160,60,0.55)' : '2px solid transparent',
                             }}
-                            onMouseEnter={e => { if (!isSelected) (e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.03)'; }}
+                            onMouseEnter={e => { if (!isSelected) (e.currentTarget as HTMLElement).style.background = 'rgba(200,160,60,0.05)'; }}
                             onMouseLeave={e => { if (!isSelected) (e.currentTarget as HTMLElement).style.background = 'transparent'; }}>
                             <td className="px-5 py-3.5">
                               <div className="flex items-center gap-3">
@@ -509,18 +509,18 @@ export default function AdminUsers() {
                                     <img src={u.avatarUrl} alt={u.username} className="w-full h-full object-cover" />
                                   ) : (
                                     <div className="w-full h-full flex items-center justify-center text-xs font-bold"
-                                      style={{ background: 'rgba(255,224,0,0.16)', color: '#FFE000' }}>
+                                      style={{ background: 'rgba(200,160,60,0.16)', color: '#C68000' }}>
                                       {getInitials(u.username)}
                                     </div>
                                   )}
                                 </div>
                                 <div>
                                   <div className="flex items-center gap-1.5">
-                                    <p className="font-medium text-xs" style={{ color: 'rgba(255,255,255,0.85)' }}>{u.username}</p>
-                                    {u.role === 'admin' && <Crown className="w-3 h-3" style={{ color: '#FFE000' }} />}
+                                    <p className="font-medium text-xs" style={{ color: '#4A3010' }}>{u.username}</p>
+                                    {u.role === 'admin' && <Crown className="w-3 h-3" style={{ color: '#C68000' }} />}
                                     {u.isVerified && <ShieldCheck className="w-3 h-3" style={{ color: 'rgba(52,211,153,0.80)' }} />}
                                   </div>
-                                  <p className="text-[11px]" style={{ color: 'rgba(255,255,255,0.35)' }}>{u.email}</p>
+                                  <p className="text-[11px]" style={{ color: '#B8A070' }}>{u.email}</p>
                                 </div>
                               </div>
                             </td>
@@ -533,29 +533,29 @@ export default function AdminUsers() {
                               </span>
                             </td>
                             <td className="px-4 py-3.5 hidden lg:table-cell">
-                              <p className="text-xs" style={{ color: 'rgba(255,255,255,0.65)' }}>{u.totalTransactions} tx</p>
+                              <p className="text-xs" style={{ color: '#7A5C30' }}>{u.totalTransactions} tx</p>
                               <p className="text-[11px] text-amber-400">★ {u.rating.toFixed(1)}</p>
                             </td>
-                            <td className="px-4 py-3.5 text-xs hidden md:table-cell" style={{ color: 'rgba(255,255,255,0.40)' }}>
+                            <td className="px-4 py-3.5 text-xs hidden md:table-cell" style={{ color: '#9A7C40' }}>
                               {u.createdAt ? formatDate(u.createdAt) : '—'}
                             </td>
                             <td className="px-4 py-3.5 text-right">
                               <div className="flex items-center justify-end gap-1">
                                 <button onClick={e => { e.stopPropagation(); handleQuickVerify(u.id, u.isVerified); }} title={u.isVerified ? 'Unverify' : 'Verify'}
-                                  className="p-1.5 rounded-lg transition-colors" style={{ color: u.isVerified ? 'rgba(52,211,153,0.80)' : 'rgba(255,255,255,0.30)' }}
-                                  onMouseEnter={e => (e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.06)'}
+                                  className="p-1.5 rounded-lg transition-colors" style={{ color: u.isVerified ? 'rgba(52,211,153,0.80)' : '#B8A070' }}
+                                  onMouseEnter={e => (e.currentTarget as HTMLElement).style.background = 'rgba(200,160,60,0.10)'}
                                   onMouseLeave={e => (e.currentTarget as HTMLElement).style.background = 'transparent'}>
                                   <Shield className="w-3.5 h-3.5" />
                                 </button>
                                 <button onClick={e => { e.stopPropagation(); handleQuickStatus(u.id, u.status === 'blocked' ? 'active' : 'blocked'); }} title={u.status === 'blocked' ? 'Unblock' : 'Block'}
-                                  className="p-1.5 rounded-lg transition-colors" style={{ color: u.status === 'blocked' ? 'rgba(252,165,165,0.85)' : 'rgba(255,255,255,0.30)' }}
-                                  onMouseEnter={e => (e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.06)'}
+                                  className="p-1.5 rounded-lg transition-colors" style={{ color: u.status === 'blocked' ? 'rgba(252,165,165,0.85)' : '#B8A070' }}
+                                  onMouseEnter={e => (e.currentTarget as HTMLElement).style.background = 'rgba(200,160,60,0.10)'}
                                   onMouseLeave={e => (e.currentTarget as HTMLElement).style.background = 'transparent'}>
                                   <Ban className="w-3.5 h-3.5" />
                                 </button>
                                 <button onClick={e => { e.stopPropagation(); openEditPanel(u); }}
-                                  className="p-1.5 rounded-lg transition-colors" style={{ color: 'rgba(255,255,255,0.30)' }}
-                                  onMouseEnter={e => (e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.06)'}
+                                  className="p-1.5 rounded-lg transition-colors" style={{ color: '#B8A070' }}
+                                  onMouseEnter={e => (e.currentTarget as HTMLElement).style.background = 'rgba(200,160,60,0.10)'}
                                   onMouseLeave={e => (e.currentTarget as HTMLElement).style.background = 'transparent'}>
                                   <Edit2 className="w-3.5 h-3.5" />
                                 </button>
@@ -574,91 +574,91 @@ export default function AdminUsers() {
           {/* Edit Panel */}
           {selectedUser && (
             <div className="w-[420px] flex-shrink-0 hidden lg:block">
-              <div className="rounded-2xl overflow-hidden sticky top-8" style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,224,0,0.16)', backdropFilter: 'blur(20px)' }}>
-                <div className="px-5 py-4 flex items-center justify-between" style={{ background: 'rgba(255,224,0,0.10)', borderBottom: '1px solid rgba(255,224,0,0.15)' }}>
+              <div className="rounded-2xl overflow-hidden sticky top-8" style={{ background: 'rgba(200,160,60,0.08)', border: '1px solid rgba(200,160,60,0.16)', backdropFilter: 'blur(20px)' }}>
+                <div className="px-5 py-4 flex items-center justify-between" style={{ background: 'rgba(200,160,60,0.10)', borderBottom: '1px solid rgba(200,160,60,0.15)' }}>
                   <div className="flex items-center gap-3">
-                    <div className="w-11 h-11 rounded-full overflow-hidden border-2 flex-shrink-0" style={{ borderColor: 'rgba(255,224,0,0.35)' }}>
+                    <div className="w-11 h-11 rounded-full overflow-hidden border-2 flex-shrink-0" style={{ borderColor: 'rgba(200,160,60,0.35)' }}>
                       {selectedUser.avatarUrl ? (
                         <img src={selectedUser.avatarUrl} alt="" className="w-full h-full object-cover" />
                       ) : (
-                        <div className="w-full h-full flex items-center justify-center font-bold text-sm" style={{ background: 'rgba(255,224,0,0.20)', color: '#FFE000' }}>
+                        <div className="w-full h-full flex items-center justify-center font-bold text-sm" style={{ background: 'rgba(200,160,60,0.20)', color: '#C68000' }}>
                           {getInitials(selectedUser.username)}
                         </div>
                       )}
                     </div>
                     <div>
                       <div className="flex items-center gap-1.5">
-                        <p className="font-heading font-bold text-sm" style={{ color: 'rgba(255,255,255,0.92)' }}>{selectedUser.username}</p>
-                        {selectedUser.role === 'admin' && <Crown className="w-3.5 h-3.5" style={{ color: '#FFE000' }} />}
+                        <p className="font-heading font-bold text-sm" style={{ color: '#2A1A00' }}>{selectedUser.username}</p>
+                        {selectedUser.role === 'admin' && <Crown className="w-3.5 h-3.5" style={{ color: '#C68000' }} />}
                         {selectedUser.isVerified && <ShieldCheck className="w-3.5 h-3.5" style={{ color: 'rgba(52,211,153,0.80)' }} />}
                       </div>
-                      <p className="text-[11px]" style={{ color: 'rgba(255,255,255,0.45)' }}>{selectedUser.email}</p>
+                      <p className="text-[11px]" style={{ color: '#9A7C40' }}>{selectedUser.email}</p>
                     </div>
                   </div>
-                  <button onClick={closePanel} className="p-1.5 rounded-lg transition-colors" style={{ color: 'rgba(255,255,255,0.45)' }}
-                    onMouseEnter={e => (e.currentTarget as HTMLElement).style.color = 'rgba(255,255,255,0.90)'}
-                    onMouseLeave={e => (e.currentTarget as HTMLElement).style.color = 'rgba(255,255,255,0.45)'}>
+                  <button onClick={closePanel} className="p-1.5 rounded-lg transition-colors" style={{ color: '#9A7C40' }}
+                    onMouseEnter={e => (e.currentTarget as HTMLElement).style.color = '#2A1A00'}
+                    onMouseLeave={e => (e.currentTarget as HTMLElement).style.color = '#9A7C40'}>
                     <X className="w-4 h-4" />
                   </button>
                 </div>
 
-                <div className="grid grid-cols-3" style={{ borderBottom: '1px solid rgba(255,255,255,0.07)' }}>
+                <div className="grid grid-cols-3" style={{ borderBottom: '1px solid rgba(200,160,60,0.10)' }}>
                   {[
                     { label: 'Transactions', value: selectedUser.totalTransactions },
                     { label: 'Rating',       value: `★ ${selectedUser.rating.toFixed(1)}` },
                     { label: 'Joined',       value: selectedUser.createdAt ? formatDate(selectedUser.createdAt).split(',')[0] : '—' },
                   ].map(s => (
-                    <div key={s.label} className="px-4 py-3 text-center" style={{ borderRight: '1px solid rgba(255,255,255,0.07)' }}>
-                      <p className="font-bold text-sm" style={{ color: 'rgba(255,255,255,0.88)' }}>{s.value}</p>
-                      <p className="text-[10px] mt-0.5" style={{ color: 'rgba(255,255,255,0.35)' }}>{s.label}</p>
+                    <div key={s.label} className="px-4 py-3 text-center" style={{ borderRight: '1px solid rgba(200,160,60,0.10)' }}>
+                      <p className="font-bold text-sm" style={{ color: '#2A1A00' }}>{s.value}</p>
+                      <p className="text-[10px] mt-0.5" style={{ color: '#B8A070' }}>{s.label}</p>
                     </div>
                   ))}
                 </div>
 
                 <div className="p-5 space-y-4 max-h-[calc(100vh-200px)] overflow-y-auto">
-                  <h3 className="font-heading font-semibold text-sm flex items-center gap-2" style={{ color: 'rgba(255,255,255,0.80)' }}>
-                    <Edit2 className="w-4 h-4" style={{ color: 'rgba(255,255,255,0.40)' }} /> Edit Profile
+                  <h3 className="font-heading font-semibold text-sm flex items-center gap-2" style={{ color: '#4A3000' }}>
+                    <Edit2 className="w-4 h-4" style={{ color: '#9A7C40' }} /> Edit Profile
                   </h3>
 
                   <div>
-                    <label className="block text-xs font-medium mb-1.5" style={{ color: 'rgba(255,255,255,0.50)' }}>Username</label>
+                    <label className="block text-xs font-medium mb-1.5" style={{ color: '#9A7C40' }}>Username</label>
                     <div className="relative">
-                      <User className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5" style={{ color: 'rgba(255,255,255,0.30)' }} />
+                      <User className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5" style={{ color: '#B8A070' }} />
                       <input value={editForm.username} onChange={e => setEditForm(f => ({ ...f, username: e.target.value }))}
                         className="w-full pl-9 pr-3 py-2.5 text-sm rounded-xl focus:outline-none transition-all"
-                        style={{ background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.10)', color: 'rgba(255,255,255,0.85)' }}
+                        style={{ background: 'rgba(200,160,60,0.10)', border: '1px solid rgba(200,160,60,0.15)', color: '#4A3010' }}
                         placeholder="Username" />
                     </div>
                   </div>
 
                   <div>
-                    <label className="block text-xs font-medium mb-1.5" style={{ color: 'rgba(255,255,255,0.50)' }}>Email (read-only)</label>
+                    <label className="block text-xs font-medium mb-1.5" style={{ color: '#9A7C40' }}>Email (read-only)</label>
                     <div className="relative">
-                      <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5" style={{ color: 'rgba(255,255,255,0.20)' }} />
+                      <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5" style={{ color: '#C8B090' }} />
                       <input value={selectedUser.email} disabled
                         className="w-full pl-9 pr-3 py-2.5 text-sm rounded-xl cursor-not-allowed"
-                        style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.35)' }} />
+                        style={{ background: 'rgba(200,160,60,0.05)', border: '1px solid rgba(200,160,60,0.10)', color: '#B8A070' }} />
                     </div>
                   </div>
 
                   <div>
-                    <label className="block text-xs font-medium mb-1.5" style={{ color: 'rgba(255,255,255,0.50)' }}>Phone</label>
+                    <label className="block text-xs font-medium mb-1.5" style={{ color: '#9A7C40' }}>Phone</label>
                     <div className="relative">
-                      <Phone className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5" style={{ color: 'rgba(255,255,255,0.30)' }} />
+                      <Phone className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5" style={{ color: '#B8A070' }} />
                       <input value={editForm.phone} onChange={e => setEditForm(f => ({ ...f, phone: e.target.value }))}
                         className="w-full pl-9 pr-3 py-2.5 text-sm rounded-xl focus:outline-none transition-all"
-                        style={{ background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.10)', color: 'rgba(255,255,255,0.85)' }}
+                        style={{ background: 'rgba(200,160,60,0.10)', border: '1px solid rgba(200,160,60,0.15)', color: '#4A3010' }}
                         placeholder="+1 234 567 890" />
                     </div>
                   </div>
 
                   <div>
-                    <label className="block text-xs font-medium mb-2" style={{ color: 'rgba(255,255,255,0.50)' }}>Role</label>
+                    <label className="block text-xs font-medium mb-2" style={{ color: '#9A7C40' }}>Role</label>
                     <div className="grid grid-cols-2 gap-2">
                       {Object.entries(ROLE_CONFIG).map(([k, v]) => (
                         <button key={k} type="button" onClick={() => setEditForm(f => ({ ...f, role: k }))}
                           className={cn('flex items-center gap-2 px-3 py-2.5 rounded-xl text-xs font-medium text-left transition-all border', v.bg, v.color)}
-                          style={editForm.role === k ? { outline: '2px solid rgba(255,224,0,0.60)', outlineOffset: '1px', opacity: 1 } : { opacity: 0.55 }}>
+                          style={editForm.role === k ? { outline: '2px solid rgba(200,160,60,0.60)', outlineOffset: '1px', opacity: 1 } : { opacity: 0.55 }}>
                           {k === 'admin' && <Crown className="w-3.5 h-3.5 flex-shrink-0" />}
                           {k === 'buyer' && <User className="w-3.5 h-3.5 flex-shrink-0" />}
                           {k === 'seller' && <Star className="w-3.5 h-3.5 flex-shrink-0" />}
@@ -671,7 +671,7 @@ export default function AdminUsers() {
                   </div>
 
                   <div>
-                    <label className="block text-xs font-medium mb-2" style={{ color: 'rgba(255,255,255,0.50)' }}>Account Status</label>
+                    <label className="block text-xs font-medium mb-2" style={{ color: '#9A7C40' }}>Account Status</label>
                     <div className="space-y-2">
                       {Object.entries(STATUS_CONFIG).map(([k, v]) => {
                         const Icon = v.icon;
@@ -681,14 +681,14 @@ export default function AdminUsers() {
                             className="w-full flex items-center gap-3 px-3.5 py-3 rounded-xl text-left transition-all"
                             style={isSel
                               ? { background: k === 'active' ? 'rgba(52,211,153,0.12)' : k === 'blocked' ? 'rgba(239,68,68,0.12)' : 'rgba(245,158,11,0.12)', border: k === 'active' ? '1px solid rgba(52,211,153,0.35)' : k === 'blocked' ? '1px solid rgba(239,68,68,0.35)' : '1px solid rgba(245,158,11,0.35)' }
-                              : { background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', opacity: 0.65 }}>
+                              : { background: 'rgba(200,160,60,0.06)', border: '1px solid rgba(200,160,60,0.12)', opacity: 0.65 }}>
                             <div className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0"
-                              style={{ background: isSel ? (k === 'active' ? 'rgba(52,211,153,0.20)' : k === 'blocked' ? 'rgba(239,68,68,0.20)' : 'rgba(245,158,11,0.20)') : 'rgba(255,255,255,0.08)' }}>
-                              <Icon className="w-4 h-4" style={{ color: isSel ? (k === 'active' ? 'rgba(52,211,153,0.90)' : k === 'blocked' ? 'rgba(252,165,165,0.90)' : 'rgba(251,191,36,0.90)') : 'rgba(255,255,255,0.40)' }} />
+                              style={{ background: isSel ? (k === 'active' ? 'rgba(52,211,153,0.20)' : k === 'blocked' ? 'rgba(239,68,68,0.20)' : 'rgba(245,158,11,0.20)') : 'rgba(200,160,60,0.12)' }}>
+                              <Icon className="w-4 h-4" style={{ color: isSel ? (k === 'active' ? 'rgba(52,211,153,0.90)' : k === 'blocked' ? 'rgba(252,165,165,0.90)' : 'rgba(251,191,36,0.90)') : '#9A7C40' }} />
                             </div>
                             <div className="flex-1 min-w-0">
-                              <p className="text-xs font-semibold" style={{ color: isSel ? (k === 'active' ? 'rgba(52,211,153,0.95)' : k === 'blocked' ? 'rgba(252,165,165,0.95)' : 'rgba(251,191,36,0.95)') : 'rgba(255,255,255,0.70)' }}>{v.label}</p>
-                              <p className="text-[11px] mt-0.5" style={{ color: 'rgba(255,255,255,0.38)' }}>{v.desc}</p>
+                              <p className="text-xs font-semibold" style={{ color: isSel ? (k === 'active' ? 'rgba(52,211,153,0.95)' : k === 'blocked' ? 'rgba(252,165,165,0.95)' : 'rgba(251,191,36,0.95)') : '#7A5C30' }}>{v.label}</p>
+                              <p className="text-[11px] mt-0.5" style={{ color: '#B8A070' }}>{v.desc}</p>
                             </div>
                             {isSel && (
                               <div className="w-4 h-4 rounded-full flex items-center justify-center flex-shrink-0"
@@ -704,46 +704,46 @@ export default function AdminUsers() {
                     {editForm.status === 'restricted' && <p className="mt-2 text-[11px] px-2" style={{ color: 'rgba(251,191,36,0.70)' }}>⚠ Restricted users can browse but cannot transact.</p>}
                   </div>
 
-                  <div className="flex items-center justify-between p-3.5 rounded-xl" style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)' }}>
+                  <div className="flex items-center justify-between p-3.5 rounded-xl" style={{ background: 'rgba(200,160,60,0.06)', border: '1px solid rgba(200,160,60,0.12)' }}>
                     <div className="flex items-center gap-2.5">
-                      <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: editForm.isVerified ? 'rgba(52,211,153,0.15)' : 'rgba(255,255,255,0.08)' }}>
-                        <ShieldCheck className="w-4 h-4" style={{ color: editForm.isVerified ? 'rgba(52,211,153,0.85)' : 'rgba(255,255,255,0.35)' }} />
+                      <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: editForm.isVerified ? 'rgba(52,211,153,0.15)' : 'rgba(200,160,60,0.12)' }}>
+                        <ShieldCheck className="w-4 h-4" style={{ color: editForm.isVerified ? 'rgba(52,211,153,0.85)' : '#B8A070' }} />
                       </div>
                       <div>
-                        <p className="text-xs font-medium" style={{ color: 'rgba(255,255,255,0.80)' }}>Identity Verified</p>
-                        <p className="text-[11px]" style={{ color: 'rgba(255,255,255,0.35)' }}>KYC / manual verification</p>
+                        <p className="text-xs font-medium" style={{ color: '#4A3000' }}>Identity Verified</p>
+                        <p className="text-[11px]" style={{ color: '#B8A070' }}>KYC / manual verification</p>
                       </div>
                     </div>
                     <button onClick={() => setEditForm(f => ({ ...f, isVerified: !f.isVerified }))}
                       className="w-10 h-6 rounded-full transition-colors relative flex-shrink-0"
-                      style={{ background: editForm.isVerified ? 'rgba(52,211,153,0.70)' : 'rgba(255,255,255,0.15)' }}>
+                      style={{ background: editForm.isVerified ? 'rgba(52,211,153,0.70)' : '#C8B090' }}>
                       <div className={cn('absolute top-0.5 w-5 h-5 rounded-full bg-white shadow transition-all', editForm.isVerified ? 'left-[18px]' : 'left-0.5')} />
                     </button>
                   </div>
 
-                  <div className="flex items-center gap-2 px-3 py-2.5 rounded-xl" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' }}>
-                    <Hash className="w-3.5 h-3.5 flex-shrink-0" style={{ color: 'rgba(255,255,255,0.25)' }} />
-                    <span className="text-[11px] font-mono truncate" style={{ color: 'rgba(255,255,255,0.35)' }}>{selectedUser.id}</span>
+                  <div className="flex items-center gap-2 px-3 py-2.5 rounded-xl" style={{ background: 'rgba(200,160,60,0.05)', border: '1px solid rgba(200,160,60,0.10)' }}>
+                    <Hash className="w-3.5 h-3.5 flex-shrink-0" style={{ color: '#C8B090' }} />
+                    <span className="text-[11px] font-mono truncate" style={{ color: '#B8A070' }}>{selectedUser.id}</span>
                   </div>
 
                   <div className="flex gap-2 pt-1">
                     <button onClick={handleSave} disabled={saving}
                       className="flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl text-sm font-semibold transition-all"
-                      style={{ background: 'rgba(255,224,0,0.18)', border: '1px solid rgba(255,224,0,0.35)', color: '#FFE000' }}
-                      onMouseEnter={e => (e.currentTarget as HTMLButtonElement).style.background = 'rgba(255,224,0,0.28)'}
-                      onMouseLeave={e => (e.currentTarget as HTMLButtonElement).style.background = 'rgba(255,224,0,0.18)'}>
+                      style={{ background: 'rgba(200,160,60,0.18)', border: '1px solid rgba(200,160,60,0.35)', color: '#C68000' }}
+                      onMouseEnter={e => (e.currentTarget as HTMLButtonElement).style.background = 'rgba(200,160,60,0.28)'}
+                      onMouseLeave={e => (e.currentTarget as HTMLButtonElement).style.background = 'rgba(200,160,60,0.18)'}>
                       {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
                       Save Changes
                     </button>
                     <button onClick={closePanel}
                       className="px-4 py-2.5 rounded-xl text-sm transition-all"
-                      style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.10)', color: 'rgba(255,255,255,0.60)' }}
-                      onMouseEnter={e => (e.currentTarget as HTMLButtonElement).style.background = 'rgba(255,255,255,0.10)'}
-                      onMouseLeave={e => (e.currentTarget as HTMLButtonElement).style.background = 'rgba(255,255,255,0.06)'}>
+                      style={{ background: 'rgba(200,160,60,0.10)', border: '1px solid rgba(200,160,60,0.15)', color: '#8A6C40' }}
+                      onMouseEnter={e => (e.currentTarget as HTMLButtonElement).style.background = 'rgba(200,160,60,0.15)'}
+                      onMouseLeave={e => (e.currentTarget as HTMLButtonElement).style.background = 'rgba(200,160,60,0.10)'}>
                       Cancel
                     </button>
                   </div>
-                  <p className="text-[10px] text-center" style={{ color: 'rgba(255,255,255,0.25)' }}>All changes are logged in the audit trail</p>
+                  <p className="text-[10px] text-center" style={{ color: '#C8B090' }}>All changes are logged in the audit trail</p>
                 </div>
               </div>
             </div>

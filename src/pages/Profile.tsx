@@ -9,6 +9,7 @@ import Navbar from '@/components/layout/Navbar';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/lib/supabase';
+import { auth as clientAuth } from '@/lib/client';
 import { formatDate, formatCurrency, getInitials, cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import type { Listing } from '@/types';
@@ -57,28 +58,27 @@ export default function Profile() {
   });
 
   const fetchProfile = useCallback(async (userId: string) => {
-    const { data: profileData } = await supabase
-      .from('user_profiles')
-      .select('*')
-      .eq('id', userId)
-      .single();
-
-    if (profileData) {
-      const mapped: ProfileData = {
-        id: profileData.id,
-        username: profileData.username || '',
-        email: profileData.email,
-        phone: profileData.phone || '',
-        avatarUrl: profileData.avatar_url,
-        role: profileData.role || 'buyer',
-        isVerified: profileData.is_verified || false,
-        isActive: profileData.is_active !== false,
-        totalTransactions: profileData.total_transactions || 0,
-        rating: Number(profileData.rating || 5.0),
-        createdAt: profileData.created_at,
-      };
-      setProfile(mapped);
-      setEditForm({ username: mapped.username, phone: mapped.phone });
+    try {
+      const profileData = await clientAuth.me();
+      if (profileData) {
+        const mapped: ProfileData = {
+          id: profileData.id,
+          username: profileData.username || '',
+          email: profileData.email,
+          phone: profileData.phone || '',
+          avatarUrl: profileData.avatar,
+          role: profileData.role || 'buyer',
+          isVerified: profileData.isVerified || false,
+          isActive: profileData.isActive !== false,
+          totalTransactions: profileData.totalTransactions || 0,
+          rating: Number(profileData.rating || 5.0),
+          createdAt: profileData.createdAt,
+        };
+        setProfile(mapped);
+        setEditForm({ username: mapped.username, phone: mapped.phone });
+      }
+    } catch {
+      // fallback — silently fail
     }
   }, []);
 
@@ -174,11 +174,13 @@ export default function Profile() {
 
     const { data: { publicUrl } } = supabase.storage.from('listing-images').getPublicUrl(filePath);
 
-    const { error: updateError } = await supabase.from('user_profiles')
-      .update({ avatar_url: publicUrl })
-      .eq('id', authUser.id);
-
-    if (updateError) { toast.error('Failed to save avatar'); setUploading(false); return; }
+    try {
+      await clientAuth.updateProfile({ avatar_url: publicUrl });
+    } catch {
+      toast.error('Failed to save avatar');
+      setUploading(false);
+      return;
+    }
 
     setProfile(prev => prev ? { ...prev, avatarUrl: publicUrl } : prev);
     toast.success('Profile photo updated!');
@@ -190,12 +192,16 @@ export default function Profile() {
     if (!editForm.username.trim()) { toast.error('Username is required'); return; }
 
     setSaving(true);
-    const { error } = await supabase.from('user_profiles').update({
-      username: editForm.username.trim(),
-      phone: editForm.phone.trim() || null,
-    }).eq('id', authUser.id);
-
-    if (error) { toast.error('Failed to save: ' + error.message); setSaving(false); return; }
+    try {
+      await clientAuth.updateProfile({
+        username: editForm.username.trim(),
+        phone: editForm.phone.trim() || null,
+      });
+    } catch (err: any) {
+      toast.error('Failed to save: ' + (err.message || 'Unknown error'));
+      setSaving(false);
+      return;
+    }
 
     setProfile(prev => prev ? { ...prev, username: editForm.username.trim(), phone: editForm.phone.trim() } : prev);
     setEditMode(false);

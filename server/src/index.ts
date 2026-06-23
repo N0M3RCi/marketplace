@@ -1,0 +1,97 @@
+import express from 'express';
+import cors from 'cors';
+import path from 'path';
+import { fileURLToPath } from 'url';
+import pool from './db.js';
+import { authMiddleware } from './middleware/auth.js';
+import authRoutes from './routes/auth.js';
+import categoriesRoutes from './routes/categories.js';
+import listingsRoutes from './routes/listings.js';
+import conversationsRoutes from './routes/conversations.js';
+import messagesRoutes from './routes/messages.js';
+import favoritesRoutes from './routes/favorites.js';
+import notificationsRoutes from './routes/notifications.js';
+import escrowRoutes from './routes/escrow.js';
+import walletRoutes from './routes/wallets.js';
+import storageRoutes from './routes/storage.js';
+import profileRoutes from './routes/profile.js';
+import reviewsRoutes from './routes/reviews.js';
+import sellerRequestRoutes from './routes/sellerRequests.js';
+import adminRoutes from './routes/admin/index.js';
+
+const app = express();
+const PORT = parseInt(process.env.PORT || '3000', 10);
+
+// Middleware
+app.use(cors());
+app.use(express.json({ limit: '50mb' }));
+app.use(express.urlencoded({ extended: true, limit: '50mb' }));
+
+// API routes (no auth required)
+app.use('/api/auth', authRoutes);
+app.use('/api/categories', categoriesRoutes);
+
+// API routes (auth required)
+app.use('/api/listings', listingsRoutes);
+app.use('/api/favorites', authMiddleware, favoritesRoutes);
+app.use('/api/conversations', authMiddleware, conversationsRoutes);
+app.use('/api/messages', authMiddleware, messagesRoutes);
+app.use('/api/notifications', authMiddleware, notificationsRoutes);
+app.use('/api/escrow', authMiddleware, escrowRoutes);
+app.use('/api/wallet', authMiddleware, walletRoutes);
+app.use('/api/storage', authMiddleware, storageRoutes);
+app.use('/api/profile', authMiddleware, profileRoutes);
+app.use('/api/reviews', authMiddleware, reviewsRoutes);
+app.use('/api/seller-requests', authMiddleware, sellerRequestRoutes);
+app.use('/api/admin', authMiddleware, adminRoutes);
+
+// Health check
+app.get('/api/health', (_req, res) => {
+  res.json({ status: 'ok', timestamp: new Date().toISOString() });
+});
+
+// Serve frontend static files in production
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const distPath = path.resolve(__dirname, '../../dist');
+
+app.use(express.static(distPath));
+app.get('*', (_req, res) => {
+  res.sendFile(path.join(distPath, 'index.html'));
+});
+
+// Start server
+async function start() {
+  try {
+    // Run SQL migrations on startup
+    await pool.query(`
+      -- Categories
+      CREATE TABLE IF NOT EXISTS categories (id UUID PRIMARY KEY DEFAULT gen_random_uuid(), name TEXT NOT NULL, slug TEXT NOT NULL UNIQUE, icon TEXT DEFAULT 'Tag', listing_count INTEGER DEFAULT 0, color TEXT DEFAULT 'text-gray-600');
+      CREATE TABLE IF NOT EXISTS user_profiles (id UUID PRIMARY KEY DEFAULT gen_random_uuid(), email TEXT NOT NULL UNIQUE, username TEXT NOT NULL, password_hash TEXT NOT NULL, avatar_url TEXT, role TEXT NOT NULL DEFAULT 'buyer' CHECK (role IN ('admin','buyer','seller','both')), is_verified BOOLEAN DEFAULT false, is_active BOOLEAN DEFAULT true, status TEXT DEFAULT 'active', phone TEXT, rating NUMERIC DEFAULT 5.0, total_transactions INTEGER DEFAULT 0, created_at TIMESTAMPTZ DEFAULT NOW(), updated_at TIMESTAMPTZ DEFAULT NOW());
+      CREATE TABLE IF NOT EXISTS listings (id UUID PRIMARY KEY DEFAULT gen_random_uuid(), title TEXT NOT NULL, description TEXT, price NUMERIC NOT NULL, currency TEXT DEFAULT 'USD', category_id UUID REFERENCES categories(id), seller_id UUID NOT NULL REFERENCES user_profiles(id), seller_name TEXT, images TEXT[] DEFAULT '{}', condition TEXT DEFAULT 'good', location TEXT, status TEXT DEFAULT 'active', view_count INTEGER DEFAULT 0, created_at TIMESTAMPTZ DEFAULT NOW(), updated_at TIMESTAMPTZ DEFAULT NOW());
+      CREATE TABLE IF NOT EXISTS escrow_cases (id TEXT PRIMARY KEY, case_number TEXT, buyer_id UUID NOT NULL REFERENCES user_profiles(id), seller_id UUID NOT NULL REFERENCES user_profiles(id), listing_id TEXT, listing_title TEXT, amount NUMERIC NOT NULL, fees NUMERIC DEFAULT 0, currency TEXT DEFAULT 'USD', status TEXT DEFAULT 'awaiting_payment', payment_address TEXT, payment_network TEXT, payment_method TEXT, payment_reference TEXT, payment_proof_url TEXT, payment_amount_sent NUMERIC, payment_submitted_at TIMESTAMPTZ, payment_verified_at TIMESTAMPTZ, payment_admin_notes TEXT, seller_item_photos TEXT[] DEFAULT '{}', seller_packaging_photos TEXT[] DEFAULT '{}', seller_packaging_video TEXT, seller_readiness_confirmed BOOLEAN DEFAULT false, seller_evidence_submitted_at TIMESTAMPTZ, seller_evidence_status TEXT DEFAULT 'pending', courier_name TEXT, tracking_number TEXT, pickup_date TIMESTAMPTZ, estimated_delivery_date TIMESTAMPTZ, actual_delivery_date TIMESTAMPTZ, delivery_status TEXT, delivery_notes TEXT, dispute_status TEXT, dispute_reason TEXT, dispute_description TEXT, dispute_outcome TEXT, admin_notes TEXT, payout_status TEXT, buyer_confirmed_at TIMESTAMPTZ, created_at TIMESTAMPTZ DEFAULT NOW(), updated_at TIMESTAMPTZ DEFAULT NOW());
+      CREATE TABLE IF NOT EXISTS escrow_timeline (id UUID PRIMARY KEY DEFAULT gen_random_uuid(), case_id TEXT NOT NULL REFERENCES escrow_cases(id), status TEXT, label TEXT, actor_name TEXT, actor_role TEXT, notes TEXT, created_at TIMESTAMPTZ DEFAULT NOW());
+      CREATE TABLE IF NOT EXISTS notifications (id UUID PRIMARY KEY DEFAULT gen_random_uuid(), user_id UUID NOT NULL REFERENCES user_profiles(id), type TEXT NOT NULL, title TEXT NOT NULL, message TEXT, case_id TEXT, is_read BOOLEAN DEFAULT false, created_at TIMESTAMPTZ DEFAULT NOW());
+      CREATE TABLE IF NOT EXISTS conversations (id UUID PRIMARY KEY DEFAULT gen_random_uuid(), buyer_id UUID NOT NULL REFERENCES user_profiles(id), seller_id UUID NOT NULL REFERENCES user_profiles(id), listing_id TEXT, listing_title TEXT, last_message TEXT, last_message_at TIMESTAMPTZ, buyer_unread INTEGER DEFAULT 0, seller_unread INTEGER DEFAULT 0, updated_at TIMESTAMPTZ DEFAULT NOW(), created_at TIMESTAMPTZ DEFAULT NOW());
+      CREATE TABLE IF NOT EXISTS messages (id UUID PRIMARY KEY DEFAULT gen_random_uuid(), conversation_id UUID NOT NULL REFERENCES conversations(id), sender_id UUID NOT NULL REFERENCES user_profiles(id), content TEXT NOT NULL, is_read BOOLEAN DEFAULT false, created_at TIMESTAMPTZ DEFAULT NOW());
+      CREATE TABLE IF NOT EXISTS favorites (id UUID PRIMARY KEY DEFAULT gen_random_uuid(), user_id UUID NOT NULL REFERENCES user_profiles(id), listing_id TEXT NOT NULL, created_at TIMESTAMPTZ DEFAULT NOW(), UNIQUE(user_id, listing_id));
+      CREATE TABLE IF NOT EXISTS wallets (id UUID PRIMARY KEY DEFAULT gen_random_uuid(), user_id UUID NOT NULL REFERENCES user_profiles(id) UNIQUE, balance NUMERIC DEFAULT 0, pending_balance NUMERIC DEFAULT 0, currency TEXT DEFAULT 'USD', created_at TIMESTAMPTZ DEFAULT NOW(), updated_at TIMESTAMPTZ DEFAULT NOW());
+      CREATE TABLE IF NOT EXISTS wallet_transactions (id UUID PRIMARY KEY DEFAULT gen_random_uuid(), wallet_id UUID NOT NULL REFERENCES wallets(id), case_id TEXT, type TEXT NOT NULL, amount NUMERIC NOT NULL, currency TEXT DEFAULT 'USD', description TEXT, status TEXT DEFAULT 'completed', created_at TIMESTAMPTZ DEFAULT NOW());
+      CREATE TABLE IF NOT EXISTS payment_settings (id UUID PRIMARY KEY DEFAULT gen_random_uuid(), method TEXT NOT NULL, is_active BOOLEAN DEFAULT true, crypto_address TEXT, crypto_network TEXT, created_at TIMESTAMPTZ DEFAULT NOW(), updated_at TIMESTAMPTZ DEFAULT NOW());
+      CREATE TABLE IF NOT EXISTS seller_requests (id UUID PRIMARY KEY DEFAULT gen_random_uuid(), user_id UUID NOT NULL REFERENCES user_profiles(id), status TEXT DEFAULT 'pending', reason TEXT, reviewed_by UUID REFERENCES user_profiles(id), reviewed_at TIMESTAMPTZ, admin_notes TEXT, created_at TIMESTAMPTZ DEFAULT NOW());
+      CREATE TABLE IF NOT EXISTS payouts (id UUID PRIMARY KEY DEFAULT gen_random_uuid(), case_id TEXT NOT NULL REFERENCES escrow_cases(id), seller_id UUID REFERENCES user_profiles(id), amount NUMERIC NOT NULL, fees NUMERIC DEFAULT 0, net_amount NUMERIC, currency TEXT DEFAULT 'USD', status TEXT DEFAULT 'pending', release_date TIMESTAMPTZ, paid_at TIMESTAMPTZ, approved_by TEXT, notes TEXT, created_at TIMESTAMPTZ DEFAULT NOW());
+      CREATE TABLE IF NOT EXISTS dispute_evidence (id UUID PRIMARY KEY DEFAULT gen_random_uuid(), case_id TEXT NOT NULL, uploaded_by UUID NOT NULL REFERENCES user_profiles(id), file_name TEXT, file_url TEXT, file_type TEXT, file_size INTEGER, created_at TIMESTAMPTZ DEFAULT NOW());
+      CREATE TABLE IF NOT EXISTS reviews (id UUID PRIMARY KEY DEFAULT gen_random_uuid(), seller_id UUID NOT NULL REFERENCES user_profiles(id), reviewer_id UUID NOT NULL REFERENCES user_profiles(id), rating INTEGER DEFAULT 5, comment TEXT, created_at TIMESTAMPTZ DEFAULT NOW());
+      CREATE TABLE IF NOT EXISTS audit_logs (id UUID PRIMARY KEY DEFAULT gen_random_uuid(), admin_id UUID REFERENCES user_profiles(id), admin_name TEXT, action TEXT NOT NULL, entity_type TEXT, entity_id TEXT, details TEXT, ip_address TEXT, created_at TIMESTAMPTZ DEFAULT NOW());
+      CREATE TABLE IF NOT EXISTS uploaded_files (id UUID PRIMARY KEY DEFAULT gen_random_uuid(), file_name TEXT NOT NULL, file_type TEXT NOT NULL, file_size INTEGER NOT NULL, file_data TEXT NOT NULL, uploaded_by UUID REFERENCES user_profiles(id), created_at TIMESTAMPTZ DEFAULT NOW());
+    `);
+    console.log('Database tables ensured.');
+  } catch (err) {
+    console.error('Migration error:', err);
+  }
+
+  app.listen(PORT, '0.0.0.0', () => {
+    console.log(`Server running on port ${PORT}`);
+  });
+}
+
+start();

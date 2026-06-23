@@ -8,6 +8,7 @@ import {
   ListChecks, RefreshCw, Loader2, CheckCircle, Activity
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
+import { admin, listings } from '@/lib/client';
 import { formatCurrency, formatDate, cn } from '@/lib/utils';
 import { toast } from 'sonner';
 
@@ -59,23 +60,17 @@ export default function Analytics() {
       { count: totalUsers },
       { count: totalListings },
       { count: activeListings },
-      { data: escrowData },
-      { data: categoryData },
+      escrowRows,
+      listingRows,
     ] = await Promise.all([
       supabase.from('user_profiles').select('*', { count: 'exact', head: true }),
       supabase.from('listings').select('*', { count: 'exact', head: true }),
       supabase.from('listings').select('*', { count: 'exact', head: true }).eq('status', 'active'),
-      supabase.from('escrow_cases').select('id, amount, fees, status, created_at, listing_title'),
-      supabase.from('escrow_cases')
-        .select(`
-          listing_id,
-          amount,
-          listings!escrow_cases_listing_id_fkey(category_id, categories!listings_category_id_fkey(name))
-        `)
-        .not('listing_id', 'is', null),
+      admin.escrow.list().catch(() => []),
+      listings.list({ status: 'active' }).catch(() => []),
     ]);
 
-    const cases = escrowData || [];
+    const cases = escrowRows || [];
     const activeStatuses = ['awaiting_payment', 'payment_submitted', 'payment_verified', 'seller_notified',
       'item_ready', 'packaging_submitted', 'packaging_approved', 'pickup_scheduled', 'in_transit', 'delivered', 'buyer_confirmed'];
 
@@ -119,11 +114,11 @@ export default function Analytics() {
 
     // Category breakdown
     const catMap: Record<string, { count: number; volume: number }> = {};
-    (categoryData || []).forEach((row: any) => {
-      const catName = row.listings?.categories?.name || 'Other';
+    (listingRows || []).forEach((row: any) => {
+      const catName = row.categoryName || 'Other';
       if (!catMap[catName]) catMap[catName] = { count: 0, volume: 0 };
       catMap[catName].count += 1;
-      catMap[catName].volume += Number(row.amount || 0);
+      catMap[catName].volume += Number(row.price || 0);
     });
     const categoryBreakdown = Object.entries(catMap)
       .map(([category, v]) => ({ category, ...v }))

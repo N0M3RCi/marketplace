@@ -1,64 +1,90 @@
-import React, { createContext, useContext, useEffect, useState } from 'react';
-import { supabase } from '@/lib/supabase';
-import { mapSupabaseUser, fetchUserWithRole, signOut as authSignOut, type AuthUser } from '@/lib/auth';
+import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
+import { auth } from '@/lib/client';
+import { type AuthUser } from '@/lib/auth';
 
 interface AuthContextValue {
   user: AuthUser | null;
   loading: boolean;
   logout: () => Promise<void>;
+  refresh: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextValue>({
   user: null,
   loading: true,
   logout: async () => {},
+  refresh: async () => {},
 });
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [loading, setLoading] = useState(true);
+  const [refreshKey, setRefreshKey] = useState(0);
+
+  const loadUser = useCallback(async () => {
+    const token = localStorage.getItem('auth_token');
+    if (!token) {
+      setUser(null);
+      setLoading(false);
+      return;
+    }
+    try {
+      const profile = await auth.me();
+      setUser({
+        id: profile.id,
+        email: profile.email,
+        username: profile.username,
+        avatar: profile.avatar,
+        role: profile.role,
+      });
+      setLoading(false);
+    } catch {
+      localStorage.removeItem('auth_token');
+      setUser(null);
+      setLoading(false);
+    }
+  }, []);
 
   useEffect(() => {
     let mounted = true;
+    const token = localStorage.getItem('auth_token');
 
-    supabase.auth.getSession().then(async ({ data: { session } }) => {
-      if (mounted && session?.user) {
-        const authUser = await fetchUserWithRole(session.user);
-        if (mounted) setUser(authUser);
-      }
-      if (mounted) setLoading(false);
-    });
-
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (event, session) => {
-        if (!mounted) return;
-        if (event === 'SIGNED_IN' && session?.user) {
-          const authUser = await fetchUserWithRole(session.user);
-          if (mounted) setUser(authUser);
-          if (mounted) setLoading(false);
-        } else if (event === 'SIGNED_OUT') {
-          setUser(null);
+    if (token) {
+      auth.me().then(profile => {
+        if (mounted) {
+          setUser({
+            id: profile.id,
+            email: profile.email,
+            username: profile.username,
+            avatar: profile.avatar,
+            role: profile.role,
+          });
           setLoading(false);
-        } else if (event === 'TOKEN_REFRESHED' && session?.user) {
-          const authUser = await fetchUserWithRole(session.user);
-          if (mounted) setUser(authUser);
         }
-      }
-    );
+      }).catch(() => {
+        localStorage.removeItem('auth_token');
+        if (mounted) setLoading(false);
+      });
+    } else {
+      if (mounted) setLoading(false);
+    }
 
-    return () => {
-      mounted = false;
-      subscription.unsubscribe();
-    };
+    return () => { mounted = false; };
+  }, [refreshKey]);
+
+  const refresh = useCallback(async () => {
+    setLoading(true);
+    await loadUser();
+  }, [loadUser]);
+
+  const logout = useCallback(async () => {
+    localStorage.removeItem('auth_token');
+    setUser(null);
+    setLoading(false);
   }, []);
 
-  const logout = async () => {
-    await authSignOut();
-    setUser(null);
-  };
-
   return (
-    <AuthContext.Provider value={{ user, loading, logout }}>
+    <AuthContext.Provider value={{ user, loading, logout, refresh }}>
       {children}
     </AuthContext.Provider>
   );

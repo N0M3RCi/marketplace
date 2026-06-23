@@ -1,0 +1,358 @@
+import { Router } from 'express';
+import { adminOnly } from '../../middleware/auth.js';
+import type { AuthRequest } from '../../middleware/auth.js';
+import pool from '../../db.js';
+import { v4 as uuid } from 'uuid';
+
+const router = Router();
+
+// All admin routes require admin role
+router.use(adminOnly);
+
+// ============ USERS ============
+router.get('/users', async (_req: AuthRequest, res) => {
+  try {
+    const result = await pool.query('SELECT * FROM user_profiles ORDER BY created_at DESC');
+    res.json(result.rows.map((u: any) => ({
+      id: u.id, email: u.email, username: u.username, role: u.role,
+      avatar_url: u.avatar_url, is_verified: u.is_verified, is_active: u.is_active,
+      status: u.status, phone: u.phone, rating: Number(u.rating),
+      total_transactions: u.total_transactions, created_at: u.created_at,
+    })));
+  } catch (err: any) { res.status(500).json({ error: err.message }); }
+});
+
+router.put('/users/:id/role', async (req: AuthRequest, res) => {
+  try {
+    await pool.query('UPDATE user_profiles SET role = $1 WHERE id = $2', [req.body.role, req.params.id]);
+    res.json({ ok: true });
+  } catch (err: any) { res.status(500).json({ error: err.message }); }
+});
+
+router.put('/users/:id/profile', async (req: AuthRequest, res) => {
+  try {
+    const { username, email, avatar_url, role, phone } = req.body;
+    await pool.query('UPDATE user_profiles SET username=COALESCE($1,username), email=COALESCE($2,email), avatar_url=COALESCE($3,avatar_url), role=COALESCE($4,role), phone=COALESCE($5,phone), updated_at=NOW() WHERE id=$6',
+      [username, email, avatar_url, role, phone, req.params.id]);
+    res.json({ ok: true });
+  } catch (err: any) { res.status(500).json({ error: err.message }); }
+});
+
+router.put('/users/:id/status', async (req: AuthRequest, res) => {
+  try {
+    await pool.query('UPDATE user_profiles SET status=$1, is_active=$2 WHERE id=$3',
+      [req.body.status, req.body.is_active, req.params.id]);
+    res.json({ ok: true });
+  } catch (err: any) { res.status(500).json({ error: err.message }); }
+});
+
+router.put('/users/:id/verify', async (req: AuthRequest, res) => {
+  try {
+    const curr = await pool.query('SELECT is_verified FROM user_profiles WHERE id=$1', [req.params.id]);
+    const newVal = !curr.rows[0]?.is_verified;
+    await pool.query('UPDATE user_profiles SET is_verified=$1 WHERE id=$2', [newVal, req.params.id]);
+    res.json({ is_verified: newVal });
+  } catch (err: any) { res.status(500).json({ error: err.message }); }
+});
+
+// ============ SELLER REQUESTS ============
+router.get('/seller-requests', async (_req: AuthRequest, res) => {
+  try {
+    const result = await pool.query(`
+      SELECT sr.*, up.username, up.email, up.created_at as user_since, up.is_verified, up.total_transactions
+      FROM seller_requests sr LEFT JOIN user_profiles up ON sr.user_id = up.id ORDER BY sr.created_at DESC`);
+    res.json(result.rows);
+  } catch (err: any) { res.status(500).json({ error: err.message }); }
+});
+
+router.put('/seller-requests/:id/approve', async (req: AuthRequest, res) => {
+  try {
+    const sr = await pool.query('SELECT * FROM seller_requests WHERE id=$1', [req.params.id]);
+    if (sr.rows.length === 0) { res.status(404).json({ error: 'Not found' }); return; }
+    const r = sr.rows[0];
+    await pool.query('UPDATE user_profiles SET role = CASE WHEN role=$1 THEN $2 ELSE $3 END WHERE id=$4',
+      ['seller', 'both', r.user_id, r.user_id]);
+    await pool.query("UPDATE seller_requests SET status='approved', reviewed_by=$1, reviewed_at=NOW() WHERE id=$2",
+      [req.userId, req.params.id]);
+    res.json({ ok: true });
+  } catch (err: any) { res.status(500).json({ error: err.message }); }
+});
+
+router.put('/seller-requests/:id/reject', async (req: AuthRequest, res) => {
+  try {
+    await pool.query("UPDATE seller_requests SET status='rejected', reviewed_by=$1, reviewed_at=NOW(), admin_notes=$2 WHERE id=$3",
+      [req.userId, req.body.notes || '', req.params.id]);
+    res.json({ ok: true });
+  } catch (err: any) { res.status(500).json({ error: err.message }); }
+});
+
+// ============ DELIVERY STATUS (admin update) ============
+router.put('/escrow/:id/delivery-status', async (req: AuthRequest, res) => {
+  try {
+    const { delivery_status, status, notes } = req.body;
+    const result = await pool.query('SELECT * FROM escrow_cases WHERE id=$1', [req.params.id]);
+    if (result.rows.length === 0) { res.status(404).json({ error: 'Not found' }); return; }
+    const escrow = result.rows[0];
+
+    await pool.query('UPDATE escrow_cases SET delivery_status=$1, status=COALESCE($2,status), updated_at=NOW() WHERE id=$3',
+      [delivery_status, status || null, req.params.id]);
+
+    // Add timeline entry
+    const timelineLabels: Record<string, string> = {
+      pickup_scheduled: 'Pickup Scheduled', picked_up: 'Picked Up',
+      in_transit: 'In Transit', out_for_delivery: 'Out for Delivery', delivered: 'Package Delivered',
+    };
+    const label = timelineLabels[delivery_status] || delivery_status;
+    await pool.query(
+      'INSERT INTO escrow_timeline (case_id, status, label, actor_name, actor_role, notes) VALUES ($1,$2,$3,$4,$5,$6)',
+      [req.params.id, delivery_status, label, 'Alex Morgan', 'Admin', notes || '']);
+
+    // Create notifications
+    const buyerNotif = delivery_status === 'delivered' ? 'Package delivered' : `Delivery status updated: ${label}`;
+    await pool.query(
+      'INSERT INTO notifications (user_id, type, title, message, case_id) VALUES ($1,$2,$3,$4,$5)',
+      [escrow.buyer_id, delivery_status === 'delivered' ? 'delivered' : 'delivery_started', `Delivery ${delivery_status === 'delivered' ? 'Delivered' : 'Updated'}`, buyerNotif, req.params.id]);
+    if (escrow.seller_id !== escrow.buyer_id) {
+      await pool.query(
+        'INSERT INTO notifications (user_id, type, title, message, case_id) VALUES ($1,$2,$3,$4,$5)',
+        [escrow.seller_id, delivery_status === 'delivered' ? 'delivered' : 'delivery_started', `Delivery ${delivery_status === 'delivered' ? 'Delivered' : 'Updated'}`, buyerNotif, req.params.id]);
+    }
+
+    res.json({ ok: true, delivery_status });
+  } catch (err: any) { res.status(500).json({ error: err.message }); }
+});
+
+// ============ LISTINGS (admin view) ============
+router.get('/listings', async (_req: AuthRequest, res) => {
+  try {
+    const result = await pool.query(`
+      SELECT l.*, c.id as c_id, c.name as c_name, up.username as seller_name
+      FROM listings l LEFT JOIN categories c ON l.category_id = c.id
+      LEFT JOIN user_profiles up ON l.seller_id = up.id ORDER BY l.created_at DESC`);
+    res.json(result.rows.map((l: any) => ({
+      ...l, category_id: l.c_id, category_name: l.c_name, seller_name: l.seller_name,
+    })));
+  } catch (err: any) { res.status(500).json({ error: err.message }); }
+});
+
+router.delete('/listings/:id', async (req: AuthRequest, res) => {
+  try {
+    await pool.query('DELETE FROM listings WHERE id=$1', [req.params.id]);
+    res.json({ ok: true });
+  } catch (err: any) { res.status(500).json({ error: err.message }); }
+});
+
+// ============ ESCROW CASES (admin view) ============
+router.get('/escrow', async (_req: AuthRequest, res) => {
+  try {
+    const result = await pool.query(`
+      SELECT e.*, b.username as buyer_name, s.username as seller_name
+      FROM escrow_cases e
+      LEFT JOIN user_profiles b ON e.buyer_id=b.id LEFT JOIN user_profiles s ON e.seller_id=s.id
+      ORDER BY e.created_at DESC`);
+    res.json(result.rows);
+  } catch (err: any) { res.status(500).json({ error: err.message }); }
+});
+
+router.get('/escrow/:id', async (req: AuthRequest, res) => {
+  try {
+    const result = await pool.query(`
+      SELECT e.*, b.username as buyer_name, b.email as buyer_email, s.username as seller_name, s.email as seller_email
+      FROM escrow_cases e LEFT JOIN user_profiles b ON e.buyer_id=b.id LEFT JOIN user_profiles s ON e.seller_id=s.id WHERE e.id=$1`,
+      [req.params.id]);
+    if (result.rows.length === 0) { res.status(404).json({ error: 'Not found' }); return; }
+    res.json(result.rows[0]);
+  } catch (err: any) { res.status(500).json({ error: err.message }); }
+});
+
+router.put('/escrow/:id', async (req: AuthRequest, res) => {
+  try {
+    const sets: string[] = ['updated_at = NOW()']; const vals: any[] = []; let idx = 1;
+    const allowed = ['status','admin_notes','payment_admin_notes','delivery_status','delivery_notes','dispute_status','dispute_outcome','payout_status','courier_name','tracking_number','estimated_delivery_date'];
+    for (const f of allowed) { if (req.body[f] !== undefined) { sets.push(`${f} = $${idx++}`); vals.push(req.body[f]); } }
+    vals.push(req.params.id);
+    await pool.query(`UPDATE escrow_cases SET ${sets.join(',')} WHERE id=$${idx}`, vals);
+    res.json({ ok: true });
+  } catch (err: any) { res.status(500).json({ error: err.message }); }
+});
+
+// ============ WALLETS ============
+router.get('/wallets', async (_req: AuthRequest, res) => {
+  try {
+    const result = await pool.query('SELECT w.*, up.username, up.email FROM wallets w LEFT JOIN user_profiles up ON w.user_id=up.id ORDER BY w.created_at DESC');
+    res.json(result.rows.map((w: any) => ({ ...w, balance: Number(w.balance), pending_balance: Number(w.pending_balance) })));
+  } catch (err: any) { res.status(500).json({ error: err.message }); }
+});
+
+router.put('/wallets/:id', async (req: AuthRequest, res) => {
+  try {
+    await pool.query('UPDATE wallets SET balance=$1, pending_balance=$2, updated_at=NOW() WHERE id=$3',
+      [req.body.balance, req.body.pending_balance, req.params.id]);
+    res.json({ ok: true });
+  } catch (err: any) { res.status(500).json({ error: err.message }); }
+});
+
+router.get('/wallet-transactions', async (_req: AuthRequest, res) => {
+  try {
+    const result = await pool.query('SELECT * FROM wallet_transactions ORDER BY created_at DESC');
+    res.json(result.rows);
+  } catch (err: any) { res.status(500).json({ error: err.message }); }
+});
+
+router.get('/wallet-transactions/:walletId', async (req: AuthRequest, res) => {
+  try {
+    const result = await pool.query('SELECT * FROM wallet_transactions WHERE wallet_id=$1 ORDER BY created_at DESC', [req.params.walletId]);
+    res.json(result.rows);
+  } catch (err: any) { res.status(500).json({ error: err.message }); }
+});
+
+// ============ PAYOUTS ============
+router.get('/payouts', async (_req: AuthRequest, res) => {
+  try {
+    const result = await pool.query(`
+      SELECT p.*, e.listing_title, e.amount as case_amount, e.fees as case_fees, e.currency as case_currency,
+        e.status as case_status, e.updated_at as case_updated
+      FROM payouts p LEFT JOIN escrow_cases e ON p.case_id=e.id ORDER BY p.created_at DESC`);
+    res.json(result.rows);
+  } catch (err: any) { res.status(500).json({ error: err.message }); }
+});
+
+router.post('/payouts', async (req: AuthRequest, res) => {
+  try {
+    const { caseId, sellerId, amount, fees, netAmount, currency } = req.body;
+    const id = uuid();
+    await pool.query(
+      `INSERT INTO payouts (id, case_id, seller_id, amount, fees, net_amount, currency, status) VALUES ($1,$2,$3,$4,$5,$6,$7,'pending')`,
+      [id, caseId, sellerId, amount, fees || 0, netAmount || amount, currency || 'USD']);
+    await pool.query("UPDATE escrow_cases SET payout_status='pending', updated_at=NOW() WHERE id=$1", [caseId]);
+    await pool.query(`INSERT INTO escrow_timeline (case_id, status, label, actor_name) VALUES ($1,'funds_released','Payout created','Admin')`, [caseId]);
+    res.status(201).json({ id });
+  } catch (err: any) { res.status(500).json({ error: err.message }); }
+});
+
+router.put('/payouts/:id', async (req: AuthRequest, res) => {
+  try {
+    await pool.query('UPDATE payouts SET status=$1, approved_by=$2, notes=$3, paid_at=NOW() WHERE id=$4',
+      [req.body.status, req.body.approved_by || 'Admin', req.body.notes || '', req.params.id]);
+    res.json({ ok: true });
+  } catch (err: any) { res.status(500).json({ error: err.message }); }
+});
+
+// ============ DISPUTES ============
+router.get('/disputes', async (_req: AuthRequest, res) => {
+  try {
+    const result = await pool.query(`
+      SELECT e.id, e.listing_title, e.amount, e.fees, e.currency, e.status, e.dispute_status,
+        e.dispute_reason, e.dispute_description, e.dispute_outcome, e.admin_notes, e.created_at,
+        b.username as buyer_name, s.username as seller_name
+      FROM escrow_cases e
+      LEFT JOIN user_profiles b ON e.buyer_id=b.id LEFT JOIN user_profiles s ON e.seller_id=s.id
+      WHERE e.status='disputed' ORDER BY e.created_at DESC`);
+    res.json(result.rows);
+  } catch (err: any) { res.status(500).json({ error: err.message }); }
+});
+
+router.get('/disputes/:id/evidence', async (req: AuthRequest, res) => {
+  try {
+    const result = await pool.query(`
+      SELECT de.*, up.username FROM dispute_evidence de
+      LEFT JOIN user_profiles up ON de.uploaded_by=up.id WHERE de.case_id=$1`, [req.params.id]);
+    res.json(result.rows);
+  } catch (err: any) { res.status(500).json({ error: err.message }); }
+});
+
+// ============ PAYMENT REVIEWS ============
+router.get('/payment-reviews', async (_req: AuthRequest, res) => {
+  try {
+    const result = await pool.query(`
+      SELECT e.*, b.username as buyer_name, s.username as seller_name
+      FROM escrow_cases e
+      LEFT JOIN user_profiles b ON e.buyer_id=b.id LEFT JOIN user_profiles s ON e.seller_id=s.id
+      WHERE e.status IN ('payment_submitted','payment_verified') ORDER BY e.created_at DESC`);
+    res.json(result.rows);
+  } catch (err: any) { res.status(500).json({ error: err.message }); }
+});
+
+// ============ PAYMENT SETTINGS ============
+router.get('/payment-settings', async (_req: AuthRequest, res) => {
+  try {
+    const result = await pool.query('SELECT * FROM payment_settings ORDER BY created_at DESC');
+    res.json(result.rows);
+  } catch (err: any) { res.status(500).json({ error: err.message }); }
+});
+
+router.post('/payment-settings', async (req: AuthRequest, res) => {
+  try {
+    const { method, crypto_address, crypto_network } = req.body;
+    await pool.query('INSERT INTO payment_settings (method, crypto_address, crypto_network) VALUES ($1,$2,$3)',
+      [method, crypto_address, crypto_network]);
+    res.status(201).json({ ok: true });
+  } catch (err: any) { res.status(500).json({ error: err.message }); }
+});
+
+router.put('/payment-settings/:id', async (req: AuthRequest, res) => {
+  try {
+    await pool.query('UPDATE payment_settings SET is_active=false WHERE id=$1', [req.params.id]);
+    res.json({ ok: true });
+  } catch (err: any) { res.status(500).json({ error: err.message }); }
+});
+
+// ============ MESSAGES (admin view) ============
+router.get('/messages', async (_req: AuthRequest, res) => {
+  try {
+    const result = await pool.query(`
+      SELECT c.*, b.username as b_name, s.username as s_name
+      FROM conversations c LEFT JOIN user_profiles b ON c.buyer_id=b.id LEFT JOIN user_profiles s ON c.seller_id=s.id
+      ORDER BY c.updated_at DESC`);
+    res.json(result.rows);
+  } catch (err: any) { res.status(500).json({ error: err.message }); }
+});
+
+// ============ ANALYTICS ============
+router.get('/analytics', async (_req: AuthRequest, res) => {
+  try {
+    const [users, listings, activeListings, escrow, disputed, escrows, revenue, monthly] = await Promise.all([
+      pool.query('SELECT COUNT(*) FROM user_profiles'),
+      pool.query('SELECT COUNT(*) FROM listings'),
+      pool.query("SELECT COUNT(*) FROM listings WHERE status='active'"),
+      pool.query("SELECT COUNT(*) FROM escrow_cases WHERE status NOT IN ('closed','funds_released','refunded')"),
+      pool.query("SELECT COUNT(*) FROM escrow_cases WHERE status='disputed'"),
+      pool.query('SELECT id, amount, fees, status, created_at, listing_title FROM escrow_cases ORDER BY created_at DESC'),
+      pool.query("SELECT COALESCE(SUM(amount),0) as total FROM escrow_cases WHERE status IN ('funds_released','buyer_confirmed','closed')"),
+      pool.query(`SELECT DATE_TRUNC('month', created_at) as month, COUNT(*) as count, COALESCE(SUM(amount),0) as volume FROM escrow_cases GROUP BY 1 ORDER BY 1`),
+    ]);
+    res.json({
+      totalUsers: parseInt(users.rows[0].count),
+      listingsCreated: parseInt(listings.rows[0].count),
+      activeEscrowCases: parseInt(escrow.rows[0].count),
+      disputedTransactions: parseInt(disputed.rows[0].count),
+      activeListings: parseInt(activeListings.rows[0].count),
+      totalEscrowVolume: Number(revenue.rows[0].total),
+      monthlyVolume: monthly.rows,
+      escrowCases: escrows.rows,
+    });
+  } catch (err: any) { res.status(500).json({ error: err.message }); }
+});
+
+// ============ AUDIT LOGS ============
+router.get('/audit-logs', async (_req: AuthRequest, res) => {
+  try {
+    const result = await pool.query('SELECT * FROM audit_logs ORDER BY created_at DESC');
+    res.json(result.rows);
+  } catch (err: any) { res.status(500).json({ error: err.message }); }
+});
+
+// ============ AUDIT LOG HELPER ============
+export async function createAuditLog(adminId: string, adminName: string, action: string, entityType: string, entityId: string, details: string, ipAddress?: string) {
+  await pool.query(
+    'INSERT INTO audit_logs (admin_id, admin_name, action, entity_type, entity_id, details, ip_address) VALUES ($1,$2,$3,$4,$5,$6,$7)',
+    [adminId, adminName, action, entityType, entityId, details, ipAddress || '']);
+}
+
+export async function createNotification(userId: string, type: string, title: string, message: string, caseId?: string) {
+  await pool.query(
+    'INSERT INTO notifications (user_id, type, title, message, case_id) VALUES ($1,$2,$3,$4,$5)',
+    [userId, type, title, message, caseId || null]);
+}
+
+export default router;

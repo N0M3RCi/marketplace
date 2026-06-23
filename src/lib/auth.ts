@@ -1,5 +1,4 @@
-import { supabase } from '@/lib/supabase';
-import type { User } from '@supabase/supabase-js';
+import { auth } from './client';
 
 export interface AuthUser {
   id: string;
@@ -9,81 +8,52 @@ export interface AuthUser {
   role: string;
 }
 
-// Base map from JWT only — role may be stale, use fetchUserWithRole for authoritative role
-export function mapSupabaseUser(user: User): AuthUser {
+// Base map from API user response
+export function mapSupabaseUser(user: any): AuthUser {
   return {
     id: user.id,
-    email: user.email!,
-    username:
-      user.user_metadata?.username ||
-      user.user_metadata?.full_name ||
-      user.email!.split('@')[0],
-    avatar: user.user_metadata?.avatar_url,
-    role: user.user_metadata?.role || 'buyer',
+    email: user.email || '',
+    username: user.user_metadata?.username || user.username || user.email?.split('@')[0] || 'User',
+    avatar: user.user_metadata?.avatar_url || user.avatar,
+    role: user.user_metadata?.role || user.role || 'buyer',
   };
 }
 
-// Fetches the authoritative role from user_profiles table, then syncs it back to user_metadata
-export async function fetchUserWithRole(user: User): Promise<AuthUser> {
-  const base = mapSupabaseUser(user);
-  const { data } = await supabase
-    .from('user_profiles')
-    .select('role, username, avatar_url')
-    .eq('id', user.id)
-    .single();
-
-  if (!data) return base;
-
-  const dbRole = data.role || base.role;
-  // Sync role back into user_metadata so JWT stays fresh
-  if (dbRole !== base.role) {
-    await supabase.auth.updateUser({ data: { role: dbRole } });
+// Fetch user profile from our backend
+export async function fetchUserWithRole(user: any): Promise<AuthUser> {
+  try {
+    const profile = await auth.me();
+    return {
+      id: profile.id,
+      email: profile.email,
+      username: profile.username,
+      avatar: profile.avatar,
+      role: profile.role,
+    };
+  } catch {
+    // Fallback to JWT data
+    return mapSupabaseUser(user);
   }
-
-  return {
-    ...base,
-    role: dbRole,
-    username: data.username || base.username,
-    avatar: data.avatar_url || base.avatar,
-  };
 }
 
 export async function sendOtp(email: string) {
-  const { error } = await supabase.auth.signInWithOtp({
-    email,
-    options: { shouldCreateUser: true },
-  });
-  if (error) throw error;
+  // Not supported in our backend - use email/password login
+  throw new Error('Email OTP not supported — use email and password to sign in');
 }
 
-export async function verifyOtpAndSetPassword(
-  email: string,
-  token: string,
-  password: string,
-  username: string
-) {
-  const { data, error } = await supabase.auth.verifyOtp({
-    email,
-    token,
-    type: 'email',
-  });
-  if (error) throw error;
-
-  const { data: updateData, error: updateError } = await supabase.auth.updateUser({
-    password,
-    data: { username, role: 'buyer' },
-  });
-  if (updateError) throw updateError;
-
-  return updateData.user!;
+export async function verifyOtpAndSetPassword(email: string, token: string, password: string, username: string) {
+  // Use register instead
+  const result = await auth.register(email, password, username);
+  localStorage.setItem('auth_token', result.token);
+  return { id: result.user.id, email: result.user.email, user_metadata: { username: result.user.username, role: result.user.role } };
 }
 
 export async function signInWithPassword(email: string, password: string) {
-  const { data, error } = await supabase.auth.signInWithPassword({ email, password });
-  if (error) throw error;
-  return data.user;
+  const result = await auth.login(email, password);
+  localStorage.setItem('auth_token', result.token);
+  return { id: result.user.id, email: result.user.email, user_metadata: { username: result.user.username, role: result.user.role, avatar_url: result.user.avatar } };
 }
 
 export async function signOut() {
-  await supabase.auth.signOut();
+  localStorage.removeItem('auth_token');
 }

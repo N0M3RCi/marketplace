@@ -8,6 +8,7 @@ import Navbar from '@/components/layout/Navbar';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/lib/supabase';
+import { sellerRequests as sellerReqApi } from '@/lib/client';
 import { formatCurrency, formatDate, formatRelativeTime, cn } from '@/lib/utils';
 import { ESCROW_STATUS_CONFIG } from '@/constants';
 import type { EscrowStatus } from '@/types';
@@ -71,17 +72,17 @@ export default function Dashboard() {
 
     setCases((data || []).map((c: any) => ({
       id: c.id,
-      caseNumber: c.case_number,
-      listingTitle: c.listing_title,
-      buyerId: c.buyer_id,
-      sellerId: c.seller_id,
-      buyerName: c.buyer?.username || 'Unknown',
-      sellerName: c.seller?.username || 'Unknown',
+      caseNumber: c.case_number || c.caseNumber,
+      listingTitle: c.listing_title || c.listingTitle,
+      buyerId: c.buyer_id || c.buyerId,
+      sellerId: c.seller_id || c.sellerId,
+      buyerName: c.buyer_name || c.buyerName || c.buyer?.username || 'Unknown',
+      sellerName: c.seller_name || c.sellerName || c.seller?.username || 'Unknown',
       amount: Number(c.amount),
       currency: c.currency || 'USD',
       status: c.status,
-      createdAt: c.created_at,
-      updatedAt: c.updated_at,
+      createdAt: c.created_at || c.createdAt,
+      updatedAt: c.updated_at || c.updatedAt,
     })));
   }, []);
 
@@ -98,9 +99,9 @@ export default function Dashboard() {
       type: n.type,
       title: n.title,
       message: n.message,
-      caseId: n.case_id,
-      isRead: n.is_read,
-      createdAt: n.created_at,
+      caseId: n.case_id || n.caseId,
+      isRead: n.is_read || n.isRead,
+      createdAt: n.created_at || n.createdAt,
     })));
   }, []);
 
@@ -126,16 +127,13 @@ export default function Dashboard() {
   const handleSubmitSellerRequest = async () => {
     if (!authUser) return;
     setSubmittingRequest(true);
-    const { error } = await supabase.from('seller_requests').insert({
-      user_id: authUser.id,
-      reason: sellerRequestReason.trim() || null,
-      status: 'pending',
-    });
-    if (error) { toast.error('Failed to submit request'); setSubmittingRequest(false); return; }
-    toast.success('Request submitted! Admin will review shortly.');
-    setSellerRequestStatus('pending');
-    setShowSellerRequestModal(false);
-    setSellerRequestReason('');
+    try {
+      await sellerReqApi.create(sellerRequestReason.trim());
+      toast.success('Request submitted! Admin will review shortly.');
+      setSellerRequestStatus('pending');
+      setShowSellerRequestModal(false);
+      setSellerRequestReason('');
+    } catch { toast.error('Failed to submit request'); }
     setSubmittingRequest(false);
   };
 

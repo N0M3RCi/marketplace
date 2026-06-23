@@ -3,6 +3,7 @@ import { useNavigate, Link } from 'react-router-dom';
 import { ShieldCheck, Mail, Lock, Eye, EyeOff, User, ArrowLeft, KeyRound } from 'lucide-react';
 import { LiquidGlassBackground, GlassCard } from '@/components/features/LiquidGlass';
 import { sendOtp, verifyOtpAndSetPassword, signInWithPassword, mapSupabaseUser } from '@/lib/auth';
+import { useAuth } from '@/hooks/useAuth';
 import { toast } from 'sonner';
 
 type Mode = 'login' | 'register';
@@ -10,6 +11,7 @@ type RegisterStep = 'email' | 'otp' | 'password';
 
 export default function Login() {
   const navigate = useNavigate();
+  const { refresh } = useAuth();
   const [mode, setMode] = useState<Mode>('login');
   const [step, setStep] = useState<RegisterStep>('email');
 
@@ -39,6 +41,7 @@ export default function Login() {
       const user = await signInWithPassword(loginEmail, loginPassword);
       const authUser = mapSupabaseUser(user);
       toast.success(`Welcome back, ${authUser.username}!`);
+      await refresh();
       if (authUser.role === 'admin') navigate('/admin');
       else navigate('/dashboard');
     } catch (err: any) {
@@ -75,6 +78,7 @@ export default function Login() {
       const user = await verifyOtpAndSetPassword(regEmail, regOtp, regPassword, regUsername);
       const authUser = mapSupabaseUser(user);
       toast.success(`Welcome to SafeEscrow, ${authUser.username}!`);
+      await refresh();
       navigate('/dashboard');
     } catch (err: any) {
       toast.error(err.message || 'Registration failed');
