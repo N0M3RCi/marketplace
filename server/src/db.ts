@@ -23,12 +23,15 @@ export async function queryWithRetry(text: string, params?: any[], retries = 2):
       return await pool.query(text, params);
     } catch (err: any) {
       const isConnectionError =
-        err.code === 'ECONNREFUSED' || err.code === '08001' || err.code === '08003' ||
-        err.code === '08006' || err.code === '08007' || err.message?.includes('connection');
+        err.code === 'ECONNREFUSED' || err.code === 'ETIMEDOUT' || err.code === '08001' || err.code === '08003' ||
+        err.code === '08004' || err.code === '08006' || err.code === '08007' || err.message?.includes('connection');
       if (isConnectionError && attempt <= retries) {
-        console.warn(`Database query failed (attempt ${attempt}), retrying in 1s...`);
+        console.warn(`Database query failed (attempt ${attempt}/${retries + 1}), retrying in 1s...`, err.code || err.message);
         await new Promise(r => setTimeout(r, 1000));
         continue;
+      }
+      if (attempt > 1 || isConnectionError) {
+        console.error(`Database query error (final): [${err.code}] ${err.message}`);
       }
       throw err;
     }

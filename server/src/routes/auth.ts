@@ -73,7 +73,10 @@ router.post('/login', async (req, res) => {
     const token = generateToken(user.id, user.role);
     res.json({ token, user: { id: user.id, email: user.email, username: user.username, role: user.role, avatar: user.avatar_url } });
   } catch (err: any) {
-    console.error('Login error:', err);
+    console.error('=== LOGIN ERROR ===');
+    console.error('Message:', err.message);
+    console.error('Code:', err.code);
+    console.error('Stack:', err.stack);
     res.status(500).json({ error: 'Login failed, please try again. If the issue persists, check your connection.' });
   }
 });
