@@ -7,7 +7,7 @@ import {
   Hash, DollarSign, Calendar, MapPin, Image as ImageIcon, PlayCircle, Settings
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { supabase } from '@/lib/supabase';
+import { admin, escrow as escrowClient } from '@/lib/client';
 import { useAuth } from '@/hooks/useAuth';
 import { formatCurrency, formatDateTime, formatDate, cn } from '@/lib/utils';
 import { ESCROW_STATUS_CONFIG, DISPUTE_REASONS } from '@/constants';
@@ -38,6 +38,10 @@ interface DBEscrowCase {
   paymentVerifiedAt?: string;
   paymentRejectedAt?: string;
   paymentAdminNotes?: string;
+  sellerEvidenceAdminNotes?: string;
+  packagingApprovedAt?: string;
+  disputeAdminNotes?: string;
+  disputeResolvedAt?: string;
   sellerItemPhotos: string[];
   sellerPackagingPhotos: string[];
   sellerPackagingVideo?: string;
@@ -100,17 +104,16 @@ export default function AdminEscrowCaseDetail() {
   const fetchCase = useCallback(async () => {
     if (!id) return;
 
-    const { data, error } = await supabase
-      .from('escrow_cases')
-      .select(`
-        *,
-        buyer:user_profiles!escrow_cases_buyer_id_fkey(id, username, email),
-        seller:user_profiles!escrow_cases_seller_id_fkey(id, username, email)
-      `)
-      .eq('id', id)
-      .single();
+    let data: any;
+    try {
+      data = await admin.escrow.get(id);
+    } catch {
+      toast.error('Escrow case not found');
+      navigate('/admin/escrow');
+      return;
+    }
 
-    if (error || !data) {
+    if (!data) {
       toast.error('Escrow case not found');
       navigate('/admin/escrow');
       return;
@@ -120,11 +123,11 @@ export default function AdminEscrowCaseDetail() {
       id: data.id,
       caseNumber: data.case_number,
       buyerId: data.buyer_id,
-      buyerName: data.buyer?.username || 'Unknown',
-      buyerEmail: data.buyer?.email || '',
+      buyerName: data.buyer_name || 'Unknown',
+      buyerEmail: data.buyer_email || '',
       sellerId: data.seller_id,
-      sellerName: data.seller?.username || 'Unknown',
-      sellerEmail: data.seller?.email || '',
+      sellerName: data.seller_name || 'Unknown',
+      sellerEmail: data.seller_email || '',
       listingTitle: data.listing_title,
       amount: Number(data.amount),
       fees: Number(data.fees || 0),
@@ -168,21 +171,20 @@ export default function AdminEscrowCaseDetail() {
     });
 
     // Fetch timeline
-    const { data: tl } = await supabase
-      .from('escrow_timeline')
-      .select('*')
-      .eq('case_id', id)
-      .order('created_at', { ascending: true });
-
-    setTimeline((tl || []).map((t: any) => ({
-      id: t.id,
-      status: t.status,
-      label: t.label,
-      timestamp: t.timestamp || t.created_at,
-      actorName: t.actor_name,
-      actorRole: t.actor_role,
-      notes: t.notes,
-    })));
+    try {
+      const tl = await escrowClient.timeline(id);
+      setTimeline((tl || []).map((t: any) => ({
+        id: t.id,
+        status: t.status,
+        label: t.label,
+        timestamp: t.timestamp || t.createdAt,
+        actorName: t.actorName || t.actor_name,
+        actorRole: t.actorRole || t.actor_role,
+        notes: t.notes,
+      })));
+    } catch {
+      setTimeline([]);
+    }
   }, [id, navigate]);
 
   useEffect(() => {
@@ -191,30 +193,43 @@ export default function AdminEscrowCaseDetail() {
   }, [fetchCase]);
 
   const addTimelineEvent = async (status: EscrowStatus | string, label: string, notes?: string) => {
-    await supabase.from('escrow_timeline').insert({
-      case_id: id,
-      status,
-      label,
-      timestamp: new Date().toISOString(),
-      actor_name: user?.username || 'Admin',
-      actor_role: 'admin',
-      notes: notes || null,
-    });
+    try {
+      await escrowClient.addTimeline({
+        caseId: id,
+        status,
+        label,
+        actorName: user?.username || 'Admin',
+        actorRole: 'admin',
+        notes: notes || null,
+      });
+    } catch {
+      // silently fail timeline inserts
+    }
   };
 
   const updateCase = async (updates: Record<string, any>, newStatus?: EscrowStatus, timelineLabel?: string, timelineNotes?: string) => {
     setSaving(true);
-    const payload = { ...updates, updated_at: new Date().toISOString() };
+    const payload: Record<string, any> = { ...updates, updated_at: new Date().toISOString() };
     if (newStatus) payload.status = newStatus;
 
-    const { error } = await supabase.from('escrow_cases').update(payload).eq('id', id);
-    if (error) { toast.error('Update failed: ' + error.message); setSaving(false); return false; }
+    const token = localStorage.getItem('auth_token');
+    const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+    if (token) headers['Authorization'] = `Bearer ${token}`;
+    const api = (path: string, body: any) => fetch(`/api${path}`, { method: 'POST', headers, body: JSON.stringify(body) });
+
+    try {
+      await admin.escrow.update(id!, payload);
+    } catch (err: any) {
+      toast.error('Update failed: ' + err.message);
+      setSaving(false);
+      return false;
+    }
 
     if (newStatus && timelineLabel) {
       await addTimelineEvent(newStatus, timelineLabel, timelineNotes || adminNote || undefined);
     }
 
-    // Send notification to relevant parties
+    // Send notifications
     if (newStatus && escrowCase) {
       const notifMap: Partial<Record<EscrowStatus, { userId: string; title: string; message: string }[]>> = {
         payment_verified: [{ userId: escrowCase.sellerId, title: 'Payment Verified', message: `Payment for "${escrowCase.listingTitle}" has been verified. Please prepare your item.` }],
@@ -233,13 +248,7 @@ export default function AdminEscrowCaseDetail() {
       const notifs = notifMap[newStatus];
       if (notifs) {
         await Promise.all(notifs.map(n =>
-          supabase.from('notifications').insert({
-            user_id: n.userId,
-            type: newStatus,
-            title: n.title,
-            message: n.message,
-            case_id: id,
-          })
+          api('/notifications', { user_id: n.userId, type: newStatus, title: n.title, message: n.message, case_id: id })
         ));
       }
     }
@@ -389,8 +398,12 @@ export default function AdminEscrowCaseDetail() {
   };
 
   const handleSaveAdminNotes = async () => {
-    const { error } = await supabase.from('escrow_cases').update({ admin_notes: adminNote, updated_at: new Date().toISOString() }).eq('id', id);
-    if (error) { toast.error('Failed to save notes'); return; }
+    try {
+      await admin.escrow.update(id!, { admin_notes: adminNote, updated_at: new Date().toISOString() });
+    } catch {
+      toast.error('Failed to save notes');
+      return;
+    }
     toast.success('Admin notes saved');
     await fetchCase();
   };

@@ -6,7 +6,7 @@ import {
   Loader2, AlertCircle, ArrowUpRight
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { supabase } from '@/lib/supabase';
+import { admin } from '@/lib/client';
 import { useAuth } from '@/hooks/useAuth';
 import { formatCurrency, formatDateTime, formatDate, cn } from '@/lib/utils';
 import { toast } from 'sonner';
@@ -58,44 +58,37 @@ export default function Payouts() {
   const [saving, setSaving] = useState(false);
 
   const fetchPayouts = useCallback(async () => {
-    // Fetch escrow cases that are ready for payout (buyer_confirmed or funds_released)
-    const { data, error } = await supabase
-      .from('escrow_cases')
-      .select(`
-        id, case_number, listing_title, amount, fees, currency, status,
-        funds_released_at, refunded_at, buyer_confirmed_at, updated_at, created_at,
-        seller:user_profiles!escrow_cases_seller_id_fkey(id, username, email)
-      `)
-      .in('status', ['buyer_confirmed', 'funds_released', 'refunded', 'disputed'])
-      .order('created_at', { ascending: false });
+    let escrowCases: any[] = [];
+    let payoutsData: any[] = [];
 
-    if (error) { toast.error('Failed to load payouts'); return; }
+    try {
+      escrowCases = await admin.escrow.list();
+    } catch {
+      toast.error('Failed to load payouts');
+      return;
+    }
 
-    // Also fetch from payouts table if it exists
-    const { data: payoutsData } = await supabase
-      .from('payouts')
-      .select(`
-        *,
-        seller:user_profiles!payouts_seller_id_fkey(id, username, email),
-        case:escrow_cases!payouts_case_id_fkey(case_number, listing_title)
-      `)
-      .order('created_at', { ascending: false });
+    try {
+      payoutsData = await admin.payouts.list();
+    } catch {
+      payoutsData = [];
+    }
 
     if (payoutsData && payoutsData.length > 0) {
       setPayouts(payoutsData.map((p: any) => ({
         id: p.id,
         payoutNumber: p.payout_number,
         caseId: p.case_id,
-        caseNumber: p.case?.case_number || '',
-        listingTitle: p.case?.listing_title || '',
+        caseNumber: p.case_number || p.case?.case_number || '',
+        listingTitle: p.listing_title || p.case?.listing_title || '',
         sellerId: p.seller_id,
         sellerName: p.seller?.username || 'Unknown',
         sellerEmail: p.seller?.email || '',
         amount: Number(p.amount),
         fees: Number(p.fees || 0),
-        netAmount: Number(p.net_amount),
+        netAmount: Number(p.net_amount || (p.amount - (p.fees || 0))),
         currency: p.currency || 'USD',
-        status: p.status,
+        status: p.status || 'pending',
         paymentMethod: p.payment_method,
         paymentReference: p.payment_reference,
         approvedBy: p.approved_by,
@@ -103,36 +96,46 @@ export default function Payouts() {
         releasedAt: p.released_at,
         paidAt: p.paid_at,
         releaseDate: p.release_date,
-        adminNotes: p.admin_notes,
+        adminNotes: p.notes || p.admin_notes,
         createdAt: p.created_at,
       })));
       return;
     }
 
-    // Fallback: generate payout records from escrow cases
-    const syntheticPayouts: Payout[] = (data || []).map((c: any) => {
-      const amount = Number(c.amount);
-      const fees = Number(c.fees || 0);
-      return {
-        id: `payout-${c.id}`,
-        payoutNumber: `PAY-${c.case_number}`,
-        caseId: c.id,
-        caseNumber: c.case_number,
-        listingTitle: c.listing_title,
-        sellerId: c.seller?.id || '',
-        sellerName: c.seller?.username || 'Unknown',
-        sellerEmail: c.seller?.email || '',
-        amount,
-        fees,
-        netAmount: amount - fees,
-        currency: c.currency || 'USD',
-        status: c.status === 'funds_released' ? 'paid' :
-                c.status === 'refunded' ? 'cancelled' :
-                c.status === 'buyer_confirmed' ? 'approved' : 'pending',
-        paidAt: c.funds_released_at,
-        createdAt: c.created_at,
-      };
+    // Fetch seller info for each case
+    const sellerInfoMap: Record<string, { id: string; username: string; email: string }> = {};
+    escrowCases.forEach((c: any) => {
+      sellerInfoMap[c.seller_id] = { id: c.seller_id, username: c.seller_name || 'Unknown', email: '' };
     });
+
+    // Fallback: generate payout records from escrow cases
+    const relevantStatuses = ['buyer_confirmed', 'funds_released', 'refunded', 'disputed'];
+    const syntheticPayouts: Payout[] = escrowCases
+      .filter((c: any) => relevantStatuses.includes(c.status))
+      .map((c: any) => {
+        const amount = Number(c.amount);
+        const fees = Number(c.fees || 0);
+        const si = sellerInfoMap[c.seller_id] || {};
+        return {
+          id: `payout-${c.id}`,
+          payoutNumber: `PAY-${c.case_number}`,
+          caseId: c.id,
+          caseNumber: c.case_number,
+          listingTitle: c.listing_title,
+          sellerId: c.seller_id,
+          sellerName: si.username || 'Unknown',
+          sellerEmail: si.email || '',
+          amount,
+          fees,
+          netAmount: amount - fees,
+          currency: c.currency || 'USD',
+          status: c.status === 'funds_released' ? 'paid' :
+                  c.status === 'refunded' ? 'cancelled' :
+                  c.status === 'buyer_confirmed' ? 'approved' : 'pending',
+          paidAt: c.funds_released_at,
+          createdAt: c.created_at,
+        };
+      });
     setPayouts(syntheticPayouts);
   }, []);
 
@@ -150,53 +153,53 @@ export default function Payouts() {
 
   const updatePayoutStatus = async (payout: Payout, newStatus: Payout['status'], extra: Record<string, any> = {}) => {
     setSaving(true);
-    // Update the escrow case status
-    const caseUpdates: Record<string, any> = { updated_at: new Date().toISOString() };
+
+    const token = localStorage.getItem('auth_token');
+    const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+    if (token) headers['Authorization'] = `Bearer ${token}`;
+    const api = (path: string, body: any) => fetch(`/api${path}`, { method: 'POST', headers, body: JSON.stringify(body) });
+
     const timelineLabel = newStatus === 'paid' ? 'Funds Released to Seller' :
                           newStatus === 'cancelled' ? 'Payout Cancelled' :
                           newStatus === 'approved' ? 'Payout Approved' : `Payout ${newStatus}`;
 
+    const caseUpdates: Record<string, any> = { updated_at: new Date().toISOString() };
+
     if (newStatus === 'paid') {
       caseUpdates.status = 'funds_released';
-      caseUpdates.funds_released_at = new Date().toISOString();
     } else if (newStatus === 'cancelled') {
       caseUpdates.status = 'refunded';
-      caseUpdates.refunded_at = new Date().toISOString();
     }
 
     if (Object.keys(caseUpdates).length > 1) {
-      await supabase.from('escrow_cases').update(caseUpdates).eq('id', payout.caseId);
+      try {
+        await admin.escrow.update(payout.caseId, caseUpdates);
+      } catch {
+        toast.error('Failed to update payout');
+        setSaving(false);
+        return;
+      }
     }
 
     // Add timeline event
-    await supabase.from('escrow_timeline').insert({
-      case_id: payout.caseId,
+    await api('/escrow/timeline', {
+      caseId: payout.caseId,
       status: newStatus === 'paid' ? 'funds_released' : newStatus,
       label: timelineLabel,
-      timestamp: new Date().toISOString(),
-      actor_name: user?.username || 'Admin',
-      actor_role: 'admin',
+      actorName: user?.username || 'Admin',
+      actorRole: 'admin',
       notes: adminNote || extra.notes || null,
     });
 
     // Notify seller
     if (newStatus === 'paid') {
-      await supabase.from('notifications').insert({
-        user_id: payout.sellerId,
-        type: 'funds_released',
-        title: 'Funds Released',
-        message: `${formatCurrency(payout.netAmount, payout.currency)} has been released to you for case ${payout.caseNumber}.`,
-        case_id: payout.caseId,
-      });
+      await api('/notifications', { user_id: payout.sellerId, type: 'funds_released', title: 'Funds Released', message: `${formatCurrency(payout.netAmount, payout.currency)} has been released to you for case ${payout.caseNumber}.`, case_id: payout.caseId });
     } else if (newStatus === 'cancelled') {
-      await supabase.from('notifications').insert({
-        user_id: payout.sellerId,
-        type: 'refund_issued',
-        title: 'Payout Cancelled',
-        message: `Your payout for case ${payout.caseNumber} has been cancelled.`,
-        case_id: payout.caseId,
-      });
+      await api('/notifications', { user_id: payout.sellerId, type: 'refund_issued', title: 'Payout Cancelled', message: `Your payout for case ${payout.caseNumber} has been cancelled.`, case_id: payout.caseId });
     }
+
+    // Audit log
+    await api('/admin/audit-logs', { admin_id: user?.id, admin_name: user?.username || 'Admin', action: `payout_${newStatus}`, entity_type: 'payout', entity_id: payout.id, details: `Payout ${newStatus} for case ${payout.caseNumber}` });
 
     toast.success(`Payout ${newStatus}`);
     setSelectedPayout(null);

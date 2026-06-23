@@ -7,6 +7,7 @@ import {
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { supabase } from '@/lib/supabase';
+import { admin } from '@/lib/client';
 import { useAuth } from '@/hooks/useAuth';
 import { formatCurrency, formatDateTime, formatDate, cn } from '@/lib/utils';
 import { DISPUTE_REASONS, ESCROW_STATUS_CONFIG } from '@/constants';
@@ -60,58 +61,47 @@ export default function Disputes() {
   const [expandedId, setExpandedId] = useState<string | null>(null);
 
   const fetchDisputes = useCallback(async () => {
-    const { data, error } = await supabase
-      .from('escrow_cases')
-      .select(`
-        id, case_number, listing_title, amount, currency, status,
-        buyer_id, seller_id,
-        dispute_opened_by, dispute_reason, dispute_description,
-        dispute_status, dispute_outcome, dispute_admin_notes, dispute_resolved_at,
-        created_at, updated_at,
-        buyer:user_profiles!escrow_cases_buyer_id_fkey(id, username),
-        seller:user_profiles!escrow_cases_seller_id_fkey(id, username)
-      `)
-      .not('dispute_status', 'is', null)
-      .order('updated_at', { ascending: false });
+    let allCases: any[];
+    try {
+      allCases = await admin.escrow.list();
+    } catch {
+      toast.error('Failed to load disputes');
+      return;
+    }
 
-    if (error) { toast.error('Failed to load disputes'); return; }
+    const data = (allCases || []).filter((c: any) => c.dispute_status);
 
     // Fetch evidence for each dispute
-    const caseIds = (data || []).map((c: any) => c.id);
-    const { data: evidenceData } = caseIds.length > 0
-      ? await supabase
-          .from('dispute_evidence')
-          .select(`
-            *,
-            submitter:user_profiles!dispute_evidence_submitted_by_fkey(id, username)
-          `)
-          .in('case_id', caseIds)
-      : { data: [] };
-
     const evidenceByCase: Record<string, DisputeEvidence[]> = {};
-    (evidenceData || []).forEach((e: any) => {
-      if (!evidenceByCase[e.case_id]) evidenceByCase[e.case_id] = [];
-      evidenceByCase[e.case_id].push({
-        id: e.id,
-        submittedBy: e.submitted_by,
-        submitterName: e.submitter?.username || 'Unknown',
-        submitterRole: e.submitter_role,
-        fileUrl: e.file_url,
-        fileType: e.file_type,
-        fileName: e.file_name,
-        description: e.description,
-        createdAt: e.created_at,
-      });
-    });
+    for (const c of data) {
+      try {
+        const evData = await admin.disputes.evidence(c.id);
+        if (evData && Array.isArray(evData)) {
+          evidenceByCase[c.id] = evData.map((e: any) => ({
+            id: e.id,
+            submittedBy: e.uploaded_by,
+            submitterName: e.username || 'Unknown',
+            submitterRole: e.submitter_role || (e.uploaded_by === c.buyer_id ? 'buyer' : 'seller'),
+            fileUrl: e.file_url,
+            fileType: e.file_type as 'image' | 'video' | 'document',
+            fileName: e.file_name,
+            description: e.description,
+            createdAt: e.created_at,
+          }));
+        }
+      } catch {
+        evidenceByCase[c.id] = [];
+      }
+    }
 
-    setDisputes((data || []).map((c: any) => ({
+    setDisputes(data.map((c: any) => ({
       id: c.id,
       caseNumber: c.case_number,
       listingTitle: c.listing_title,
       buyerId: c.buyer_id,
-      buyerName: c.buyer?.username || 'Unknown',
+      buyerName: c.buyer_name || 'Unknown',
       sellerId: c.seller_id,
-      sellerName: c.seller?.username || 'Unknown',
+      sellerName: c.seller_name || 'Unknown',
       amount: Number(c.amount),
       currency: c.currency || 'USD',
       status: c.status,
@@ -155,7 +145,7 @@ export default function Disputes() {
       request_more_evidence: 'More Evidence Requested',
     };
 
-    const newCaseStatus: Record<string, EscrowStatus> = {
+    const newCaseStatus: Record<string, string> = {
       full_refund: 'refunded',
       partial_refund: 'refunded',
       release_funds: 'funds_released',
@@ -165,65 +155,50 @@ export default function Disputes() {
       dispute_status: outcome === 'request_more_evidence' ? 'under_review' : 'resolved',
       dispute_outcome: outcome,
       dispute_admin_notes: note,
-      dispute_resolved_at: outcome !== 'request_more_evidence' ? new Date().toISOString() : null,
       updated_at: new Date().toISOString(),
     };
 
     if (newCaseStatus[outcome]) {
       caseUpdates.status = newCaseStatus[outcome];
-      if (outcome.includes('refund')) caseUpdates.refunded_at = new Date().toISOString();
-      if (outcome === 'release_funds') caseUpdates.funds_released_at = new Date().toISOString();
     }
 
-    const { error } = await supabase.from('escrow_cases').update(caseUpdates).eq('id', dispute.id);
-    if (error) { toast.error('Failed to resolve dispute'); setSaving(null); return; }
+    try {
+      await admin.escrow.update(dispute.id, caseUpdates);
+    } catch {
+      toast.error('Failed to resolve dispute');
+      setSaving(null);
+      return;
+    }
+
+    const token = localStorage.getItem('auth_token');
+    const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+    if (token) headers['Authorization'] = `Bearer ${token}`;
+    const api = (path: string, body: any) => fetch(`/api${path}`, { method: 'POST', headers, body: JSON.stringify(body) });
 
     // Add timeline
-    await supabase.from('escrow_timeline').insert({
-      case_id: dispute.id,
+    await api('/escrow/timeline', {
+      caseId: dispute.id,
       status: newCaseStatus[outcome] || dispute.status,
       label: `Dispute Resolved: ${outcomeLabels[outcome]}`,
-      timestamp: new Date().toISOString(),
-      actor_name: user?.username || 'Admin',
-      actor_role: 'admin',
+      actorName: user?.username || 'Admin',
+      actorRole: 'admin',
       notes: note,
     });
 
     // Notify both parties
-    const notifications = [];
+    const notifications: any[] = [];
     if (outcome === 'full_refund' || outcome === 'partial_refund') {
-      notifications.push({
-        user_id: dispute.buyerId,
-        type: 'dispute_resolved',
-        title: 'Dispute Resolved',
-        message: `Your dispute for "${dispute.listingTitle}" has been resolved: ${outcomeLabels[outcome]}.`,
-        case_id: dispute.id,
-      });
-      notifications.push({
-        user_id: dispute.sellerId,
-        type: 'dispute_resolved',
-        title: 'Dispute Resolved',
-        message: `The dispute for case ${dispute.caseNumber} has been resolved: ${outcomeLabels[outcome]}.`,
-        case_id: dispute.id,
-      });
+      notifications.push({ user_id: dispute.buyerId, type: 'dispute_resolved', title: 'Dispute Resolved', message: `Your dispute for "${dispute.listingTitle}" has been resolved: ${outcomeLabels[outcome]}.`, case_id: dispute.id });
+      notifications.push({ user_id: dispute.sellerId, type: 'dispute_resolved', title: 'Dispute Resolved', message: `The dispute for case ${dispute.caseNumber} has been resolved: ${outcomeLabels[outcome]}.`, case_id: dispute.id });
     } else if (outcome === 'release_funds') {
-      notifications.push({
-        user_id: dispute.sellerId,
-        type: 'funds_released',
-        title: 'Funds Released',
-        message: `Dispute resolved in your favor. ${formatCurrency(dispute.amount, dispute.currency)} released.`,
-        case_id: dispute.id,
-      });
+      notifications.push({ user_id: dispute.sellerId, type: 'funds_released', title: 'Funds Released', message: `Dispute resolved in your favor. ${formatCurrency(dispute.amount, dispute.currency)} released.`, case_id: dispute.id });
     } else {
-      notifications.push({
-        user_id: dispute.disputeOpenedBy || dispute.buyerId,
-        type: 'dispute_update',
-        title: 'Additional Evidence Requested',
-        message: `Admin has requested more evidence for dispute on case ${dispute.caseNumber}.`,
-        case_id: dispute.id,
-      });
+      notifications.push({ user_id: dispute.disputeOpenedBy || dispute.buyerId, type: 'dispute_update', title: 'Additional Evidence Requested', message: `Admin has requested more evidence for dispute on case ${dispute.caseNumber}.`, case_id: dispute.id });
     }
-    await Promise.all(notifications.map(n => supabase.from('notifications').insert(n)));
+    await Promise.all(notifications.map(n => api('/notifications', n)));
+
+    // Audit log
+    await api('/admin/audit-logs', { admin_id: user?.id, admin_name: user?.username || 'Admin', action: outcome === 'request_more_evidence' ? 'request_evidence' : 'resolve_dispute', entity_type: 'escrow_case', entity_id: dispute.id, details: `Dispute resolved: ${outcomeLabels[outcome]}` });
 
     toast.success(`Dispute resolved: ${outcomeLabels[outcome]}`);
     setAdminNotes(prev => ({ ...prev, [dispute.id]: '' }));

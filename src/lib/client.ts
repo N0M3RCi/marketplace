@@ -144,6 +144,8 @@ export const admin = {
   },
   listings: {
     list: () => request('/api/admin/listings'),
+    update: (id: string, data: any) =>
+      request(`/api/admin/listings/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
     delete: (id: string) =>
       request(`/api/admin/listings/${id}`, { method: 'DELETE' }),
   },

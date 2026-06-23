@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import { Search, ChevronRight, Eye, Filter, RefreshCw, Plus, AlertCircle } from 'lucide-react';
 import StatusBadge from '@/components/features/StatusBadge';
 import { Button } from '@/components/ui/button';
-import { supabase } from '@/lib/supabase';
+import { admin } from '@/lib/client';
 import { formatCurrency, formatDate, cn } from '@/lib/utils';
 import type { EscrowStatus } from '@/types';
 import { ESCROW_STATUS_CONFIG } from '@/constants';
@@ -40,25 +40,20 @@ export default function EscrowCases() {
   const [statusFilter, setStatusFilter] = useState<EscrowStatus | 'all'>('all');
 
   const fetchCases = useCallback(async () => {
-    const { data, error } = await supabase
-      .from('escrow_cases')
-      .select(`
-        id, case_number, listing_title, amount, fees, currency, status,
-        payment_submitted_at, seller_evidence_submitted_at, dispute_status,
-        created_at, updated_at,
-        buyer:user_profiles!escrow_cases_buyer_id_fkey(username),
-        seller:user_profiles!escrow_cases_seller_id_fkey(username)
-      `)
-      .order('created_at', { ascending: false });
-
-    if (error) { toast.error('Failed to load escrow cases'); return; }
+    let data;
+    try {
+      data = await admin.escrow.list();
+    } catch (err: any) {
+      toast.error('Failed to load escrow cases');
+      return;
+    }
 
     setCases((data || []).map((c: any) => ({
       id: c.id,
       caseNumber: c.case_number,
       listingTitle: c.listing_title,
-      buyerName: c.buyer?.username || 'Unknown',
-      sellerName: c.seller?.username || 'Unknown',
+      buyerName: c.buyer_name || 'Unknown',
+      sellerName: c.seller_name || 'Unknown',
       amount: Number(c.amount),
       fees: Number(c.fees || 0),
       currency: c.currency || 'USD',

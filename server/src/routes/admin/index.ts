@@ -71,7 +71,7 @@ router.put('/seller-requests/:id/approve', async (req: AuthRequest, res) => {
     if (sr.rows.length === 0) { res.status(404).json({ error: 'Not found' }); return; }
     const r = sr.rows[0];
     await pool.query('UPDATE user_profiles SET role = CASE WHEN role=$1 THEN $2 ELSE $3 END WHERE id=$4',
-      ['seller', 'both', r.user_id, r.user_id]);
+      ['seller', 'both', 'seller', r.user_id]);
     await pool.query("UPDATE seller_requests SET status='approved', reviewed_by=$1, reviewed_at=NOW() WHERE id=$2",
       [req.userId, req.params.id]);
     res.json({ ok: true });
@@ -135,6 +135,27 @@ router.get('/listings', async (_req: AuthRequest, res) => {
   } catch (err: any) { res.status(500).json({ error: err.message }); }
 });
 
+router.put('/listings/:id', async (req: AuthRequest, res) => {
+  try {
+    const { title, description, price, currency, condition, location, status, category_id } = req.body;
+    const sets: string[] = ['updated_at = NOW()'];
+    const vals: any[] = [];
+    let idx = 1;
+    if (title !== undefined) { sets.push(`title = $${idx++}`); vals.push(title); }
+    if (description !== undefined) { sets.push(`description = $${idx++}`); vals.push(description); }
+    if (price !== undefined) { sets.push(`price = $${idx++}`); vals.push(price); }
+    if (currency !== undefined) { sets.push(`currency = $${idx++}`); vals.push(currency); }
+    if (condition !== undefined) { sets.push(`"condition" = $${idx++}`); vals.push(condition); }
+    if (location !== undefined) { sets.push(`location = $${idx++}`); vals.push(location); }
+    if (status !== undefined) { sets.push(`status = $${idx++}`); vals.push(status); }
+    if (category_id !== undefined) { sets.push(`category_id = $${idx++}`); vals.push(category_id); }
+    if (sets.length === 1) { res.json({ ok: true }); return; }
+    vals.push(req.params.id);
+    await pool.query(`UPDATE listings SET ${sets.join(', ')} WHERE id = $${idx}`, vals);
+    res.json({ ok: true });
+  } catch (err: any) { res.status(500).json({ error: err.message }); }
+});
+
 router.delete('/listings/:id', async (req: AuthRequest, res) => {
   try {
     await pool.query('DELETE FROM listings WHERE id=$1', [req.params.id]);
@@ -168,7 +189,7 @@ router.get('/escrow/:id', async (req: AuthRequest, res) => {
 router.put('/escrow/:id', async (req: AuthRequest, res) => {
   try {
     const sets: string[] = ['updated_at = NOW()']; const vals: any[] = []; let idx = 1;
-    const allowed = ['status','admin_notes','payment_admin_notes','delivery_status','delivery_notes','dispute_status','dispute_outcome','payout_status','courier_name','tracking_number','estimated_delivery_date'];
+    const allowed = ['status','admin_notes','payment_admin_notes','payment_verified_at','payment_rejected_at','payment_submitted_at','payment_proof_url','payment_reference','payment_amount_sent','delivery_status','delivery_notes','dispute_status','dispute_outcome','dispute_admin_notes','dispute_resolved_at','payout_status','courier_name','tracking_number','pickup_date','estimated_delivery_date','actual_delivery_date','delivered_at','seller_evidence_status','seller_evidence_admin_notes','packaging_approved_at','seller_item_photos','seller_packaging_photos','seller_packaging_video','funds_released_at','refunded_at','updated_at'];
     for (const f of allowed) { if (req.body[f] !== undefined) { sets.push(`${f} = $${idx++}`); vals.push(req.body[f]); } }
     vals.push(req.params.id);
     await pool.query(`UPDATE escrow_cases SET ${sets.join(',')} WHERE id=$${idx}`, vals);
@@ -203,6 +224,17 @@ router.get('/wallet-transactions/:walletId', async (req: AuthRequest, res) => {
   try {
     const result = await pool.query('SELECT * FROM wallet_transactions WHERE wallet_id=$1 ORDER BY created_at DESC', [req.params.walletId]);
     res.json(result.rows);
+  } catch (err: any) { res.status(500).json({ error: err.message }); }
+});
+
+router.post('/wallet-transactions', async (req: AuthRequest, res) => {
+  try {
+    const { wallet_id, type, amount, currency, status, description, balance_after } = req.body;
+    const id = uuid();
+    await pool.query(
+      'INSERT INTO wallet_transactions (id, wallet_id, type, amount, currency, status, description) VALUES ($1,$2,$3,$4,$5,$6,$7)',
+      [id, wallet_id, type, amount, currency || 'USD', status || 'completed', description || '']);
+    res.status(201).json({ id });
   } catch (err: any) { res.status(500).json({ error: err.message }); }
 });
 
@@ -308,6 +340,31 @@ router.get('/messages', async (_req: AuthRequest, res) => {
   } catch (err: any) { res.status(500).json({ error: err.message }); }
 });
 
+// POST /api/admin/messages — send a message on behalf of any user (admin bypass)
+router.post('/messages', async (req: AuthRequest, res) => {
+  try {
+    const { conversationId, senderId, content } = req.body;
+    if (!conversationId || !senderId || !content) {
+      res.status(400).json({ error: 'conversationId, senderId, and content are required' });
+      return;
+    }
+    const id = uuid();
+    await pool.query(
+      'INSERT INTO messages (id, conversation_id, sender_id, content) VALUES ($1,$2,$3,$4)',
+      [id, conversationId, senderId, content]);
+    await pool.query(
+      'UPDATE conversations SET last_message=$1, last_message_at=NOW(), updated_at=NOW() WHERE id=$2',
+      [content.substring(0, 100), conversationId]);
+    const user = await pool.query('SELECT username FROM user_profiles WHERE id=$1', [senderId]);
+    res.status(201).json({
+      id, conversationId, senderId,
+      senderName: user.rows[0]?.username || 'Unknown',
+      content, isRead: false,
+      createdAt: new Date().toISOString(),
+    });
+  } catch (err: any) { res.status(500).json({ error: err.message }); }
+});
+
 // ============ ANALYTICS ============
 router.get('/analytics', async (_req: AuthRequest, res) => {
   try {
@@ -338,7 +395,23 @@ router.get('/analytics', async (_req: AuthRequest, res) => {
 router.get('/audit-logs', async (_req: AuthRequest, res) => {
   try {
     const result = await pool.query('SELECT * FROM audit_logs ORDER BY created_at DESC');
-    res.json(result.rows);
+    res.json(result.rows.map((l: any) => ({
+      id: l.id, admin_id: l.admin_id, admin_name: l.admin_name, action: l.action,
+      entity_type: l.entity_type, entity_id: l.entity_id, details: l.details,
+      ip_address: l.ip_address, created_at: l.created_at,
+    })));
+  } catch (err: any) { res.status(500).json({ error: err.message }); }
+});
+
+router.post('/audit-logs', async (req: AuthRequest, res) => {
+  try {
+    const { admin_id, admin_name, action, entity_type, entity_id, details, ip_address } = req.body;
+    const { v4: uuid } = await import('uuid');
+    const id = uuid();
+    await pool.query(
+      'INSERT INTO audit_logs (id, admin_id, admin_name, action, entity_type, entity_id, details, ip_address) VALUES ($1,$2,$3,$4,$5,$6,$7,$8)',
+      [id, admin_id, admin_name, action, entity_type, entity_id, details, ip_address || req.ip || '']);
+    res.status(201).json({ ok: true });
   } catch (err: any) { res.status(500).json({ error: err.message }); }
 });
 

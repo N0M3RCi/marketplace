@@ -7,6 +7,7 @@ import {
   BarChart3, Loader2, ArrowUpRight, Wallet
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
+import { admin } from '@/lib/client';
 import { formatCurrency, formatRelativeTime, formatDate, cn } from '@/lib/utils';
 import { ESCROW_STATUS_CONFIG } from '@/constants';
 import type { EscrowStatus } from '@/types';
@@ -56,25 +57,20 @@ export default function AdminDashboard() {
     const [
       { count: totalUsers },
       { count: totalListings },
-      { data: escrowData },
-      { data: recentData },
+      allEscrowCases,
     ] = await Promise.all([
       supabase.from('user_profiles').select('*', { count: 'exact', head: true }),
       supabase.from('listings').select('*', { count: 'exact', head: true }),
-      supabase.from('escrow_cases').select('id, amount, fees, status, payment_submitted_at, seller_evidence_submitted_at, dispute_status, buyer_confirmed_at'),
-      supabase
-        .from('escrow_cases')
-        .select(`
-          id, case_number, listing_title, amount, currency, status, updated_at,
-          buyer:user_profiles!escrow_cases_buyer_id_fkey(username),
-          seller:user_profiles!escrow_cases_seller_id_fkey(username)
-        `)
-        .order('updated_at', { ascending: false })
-        .limit(10),
+      admin.escrow.list().catch(() => []),
     ]);
 
-    const cases = escrowData || [];
+    const cases = allEscrowCases || [];
     const activeStatuses = ['awaiting_payment','payment_submitted','payment_verified','seller_notified','item_ready','packaging_submitted','packaging_approved','pickup_scheduled','in_transit','delivered'];
+
+    // Recent cases: sort by updated_at, take top 10
+    const recent = [...cases]
+      .sort((a: any, b: any) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime())
+      .slice(0, 10);
 
     setStats({
       totalUsers: totalUsers || 0,
@@ -82,23 +78,23 @@ export default function AdminDashboard() {
       totalListings: totalListings || 0,
       activeListings: Math.floor((totalListings || 0) * 0.8),
       totalEscrowCases: cases.length,
-      activeEscrowCases: cases.filter(c => activeStatuses.includes(c.status)).length,
-      completedCases: cases.filter(c => ['funds_released', 'closed'].includes(c.status)).length,
-      disputedCases: cases.filter(c => c.status === 'disputed' || c.dispute_status).length,
-      totalEscrowVolume: cases.reduce((s, c) => s + Number(c.amount || 0), 0),
-      totalRevenue: cases.filter(c => c.status === 'funds_released').reduce((s, c) => s + Number(c.fees || 0), 0),
-      pendingPayments: cases.filter(c => c.status === 'payment_submitted').length,
-      pendingEvidence: cases.filter(c => c.status === 'packaging_submitted').length,
-      activeDisputes: cases.filter(c => c.dispute_status && c.dispute_status !== 'resolved').length,
-      pendingPayouts: cases.filter(c => c.status === 'buyer_confirmed').length,
+      activeEscrowCases: cases.filter((c: any) => activeStatuses.includes(c.status)).length,
+      completedCases: cases.filter((c: any) => ['funds_released', 'closed'].includes(c.status)).length,
+      disputedCases: cases.filter((c: any) => c.status === 'disputed' || c.dispute_status).length,
+      totalEscrowVolume: cases.reduce((s: number, c: any) => s + Number(c.amount || 0), 0),
+      totalRevenue: cases.filter((c: any) => c.status === 'funds_released').reduce((s: number, c: any) => s + Number(c.fees || 0), 0),
+      pendingPayments: cases.filter((c: any) => c.status === 'payment_submitted').length,
+      pendingEvidence: cases.filter((c: any) => c.status === 'packaging_submitted').length,
+      activeDisputes: cases.filter((c: any) => c.dispute_status && c.dispute_status !== 'resolved').length,
+      pendingPayouts: cases.filter((c: any) => c.status === 'buyer_confirmed').length,
     });
 
-    setRecentCases((recentData || []).map((c: any) => ({
+    setRecentCases(recent.map((c: any) => ({
       id: c.id,
       caseNumber: c.case_number,
       listingTitle: c.listing_title,
-      buyerName: c.buyer?.username || 'Unknown',
-      sellerName: c.seller?.username || 'Unknown',
+      buyerName: c.buyer_name || 'Unknown',
+      sellerName: c.seller_name || 'Unknown',
       amount: Number(c.amount),
       currency: c.currency || 'USD',
       status: c.status,

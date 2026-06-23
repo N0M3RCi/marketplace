@@ -4,7 +4,7 @@ import {
   ChevronRight, Clock, ShieldCheck, Eye, AlertCircle
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { supabase } from '@/lib/supabase';
+import { admin, messages as messagesClient } from '@/lib/client';
 import { useAuth } from '@/hooks/useAuth';
 import { formatRelativeTime, formatDateTime, getInitials, cn } from '@/lib/utils';
 import { toast } from 'sonner';
@@ -32,7 +32,6 @@ interface AdminMessage {
   content: string;
   isRead: boolean;
   createdAt: string;
-  isAdminMessage?: boolean;
 }
 
 export default function AdminMessages() {
@@ -50,56 +49,51 @@ export default function AdminMessages() {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const pollRef = useRef<NodeJS.Timeout | null>(null);
 
+  const token = () => localStorage.getItem('auth_token');
+  const authHeaders = (): Record<string, string> => {
+    const t = token();
+    const h: Record<string, string> = { 'Content-Type': 'application/json' };
+    if (t) h['Authorization'] = `Bearer ${t}`;
+    return h;
+  };
+
   const fetchConversations = useCallback(async () => {
-    const { data, error } = await supabase
-      .from('conversations')
-      .select(`
-        id, listing_id, listing_title, buyer_id, seller_id,
-        last_message, last_message_at, buyer_unread, seller_unread, created_at,
-        buyer:user_profiles!conversations_buyer_id_fkey(id, username),
-        seller:user_profiles!conversations_seller_id_fkey(id, username)
-      `)
-      .order('last_message_at', { ascending: false, nullsFirst: false });
-
-    if (error) { toast.error('Failed to load conversations'); return; }
-
-    setConversations((data || []).map((c: any) => ({
-      id: c.id,
-      listingId: c.listing_id,
-      listingTitle: c.listing_title,
-      buyerId: c.buyer_id,
-      buyerName: c.buyer?.username || 'Unknown Buyer',
-      sellerId: c.seller_id,
-      sellerName: c.seller?.username || 'Unknown Seller',
-      lastMessage: c.last_message,
-      lastMessageAt: c.last_message_at,
-      buyerUnread: c.buyer_unread || 0,
-      sellerUnread: c.seller_unread || 0,
-      createdAt: c.created_at,
-    })));
+    try {
+      const data = await admin.messages.list();
+      setConversations((data || []).map((c: any) => ({
+        id: c.id,
+        listingId: c.listing_id,
+        listingTitle: c.listing_title,
+        buyerId: c.buyer_id,
+        buyerName: c.b_name || 'Unknown Buyer',
+        sellerId: c.seller_id,
+        sellerName: c.s_name || 'Unknown Seller',
+        lastMessage: c.last_message,
+        lastMessageAt: c.last_message_at,
+        buyerUnread: c.buyer_unread || 0,
+        sellerUnread: c.seller_unread || 0,
+        createdAt: c.created_at,
+      })));
+    } catch {
+      toast.error('Failed to load conversations');
+    }
   }, []);
 
   const fetchMessages = useCallback(async (convId: string) => {
-    const { data, error } = await supabase
-      .from('messages')
-      .select(`
-        id, conversation_id, sender_id, content, is_read, created_at,
-        sender:user_profiles!messages_sender_id_fkey(id, username)
-      `)
-      .eq('conversation_id', convId)
-      .order('created_at', { ascending: true });
-
-    if (error) return;
-
-    setMessages((data || []).map((m: any) => ({
-      id: m.id,
-      conversationId: m.conversation_id,
-      senderId: m.sender_id,
-      senderName: m.sender?.username || 'Unknown',
-      content: m.content,
-      isRead: m.is_read,
-      createdAt: m.created_at,
-    })));
+    try {
+      const data = await messagesClient.list(convId);
+      setMessages((data || []).map((m: any) => ({
+        id: m.id,
+        conversationId: m.conversationId || m.conversation_id,
+        senderId: m.senderId || m.sender_id,
+        senderName: m.senderName || m.sender_name || 'Unknown',
+        content: m.content,
+        isRead: m.isRead ?? m.is_read,
+        createdAt: m.createdAt || m.created_at,
+      })));
+    } catch {
+      // silent fail
+    }
   }, []);
 
   useEffect(() => {
@@ -144,7 +138,6 @@ export default function AdminMessages() {
       actualSenderId = selectedConv.sellerId;
       senderLabel = selectedConv.sellerName;
     } else {
-      // Admin sends as themselves — use buyer ID as fallback for DB constraint
       actualSenderId = user?.id || selectedConv.buyerId;
       senderLabel = `Admin (${user?.username || 'Admin'})`;
     }
@@ -153,34 +146,42 @@ export default function AdminMessages() {
       ? `[ADMIN] ${newMessage.trim()}`
       : newMessage.trim();
 
-    const { error } = await supabase.from('messages').insert({
-      conversation_id: selectedConv.id,
-      sender_id: actualSenderId,
-      content: messageContent,
-      is_read: false,
-    });
-
-    if (error) { toast.error('Failed to send message'); setSending(false); return; }
-
-    // Update conversation last message
-    await supabase.from('conversations').update({
-      last_message: messageContent.substring(0, 100),
-      last_message_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-    }).eq('id', selectedConv.id);
+    try {
+      await fetch('/api/admin/messages', {
+        method: 'POST',
+        headers: authHeaders(),
+        body: JSON.stringify({
+          conversationId: selectedConv.id,
+          senderId: actualSenderId,
+          content: messageContent,
+        }),
+      });
+    } catch {
+      toast.error('Failed to send message');
+      setSending(false);
+      return;
+    }
 
     // Log admin action
-    await supabase.from('audit_logs').insert({
-      admin_id: user?.id,
-      admin_name: user?.username || 'Admin',
-      action: 'send_message',
-      entity_type: 'conversation',
-      entity_id: selectedConv.id,
-      details: `Admin sent message as ${senderLabel} in conversation about "${selectedConv.listingTitle || 'unlisted item'}"`,
-    });
+    try {
+      await fetch('/api/admin/audit-logs', {
+        method: 'POST',
+        headers: authHeaders(),
+        body: JSON.stringify({
+          admin_id: user?.id,
+          admin_name: user?.username || 'Admin',
+          action: 'send_message',
+          entity_type: 'conversation',
+          entity_id: selectedConv.id,
+          details: `Admin sent message as ${senderLabel} in conversation about "${selectedConv.listingTitle || 'unlisted item'}"`,
+        }),
+      });
+    } catch { /* audit log silently */ }
 
     setNewMessage('');
     await fetchMessages(selectedConv.id);
+    // Refresh conversation list to update last message
+    await fetchConversations();
     setSending(false);
   };
 
@@ -211,8 +212,8 @@ export default function AdminMessages() {
     <div className="p-6 lg:p-8">
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="font-heading text-2xl font-bold text-foreground">Message Management</h1>
-          <p className="text-muted-foreground text-sm mt-1">
+          <h1 className="font-heading text-2xl font-bold" style={{ color: '#2A1A00' }}>Message Management</h1>
+          <p className="text-sm mt-1" style={{ color: '#9A7C40' }}>
             View all conversations and reply as admin, buyer, or seller
             {totalUnread > 0 && (
               <span className="ml-2 text-[11px] bg-red-100 text-red-700 px-2 py-0.5 rounded-full font-semibold">
@@ -222,7 +223,8 @@ export default function AdminMessages() {
           </p>
         </div>
         <button onClick={handleRefresh} disabled={refreshing}
-          className="p-2 rounded-lg border border-border text-muted-foreground hover:text-foreground hover:bg-muted transition-colors">
+          className="p-2 rounded-lg border transition-colors"
+          style={{ border: '1px solid rgba(200,160,60,0.25)', color: '#9A7C40' }}>
           <RefreshCw className={cn('w-4 h-4', refreshing && 'animate-spin')} />
         </button>
       </div>

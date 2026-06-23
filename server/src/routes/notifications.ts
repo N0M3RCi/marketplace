@@ -39,4 +39,19 @@ router.put('/read-all', async (req: AuthRequest, res) => {
   }
 });
 
+// POST /api/notifications (admin creates a notification)
+router.post('/', async (req: AuthRequest, res) => {
+  try {
+    const { user_id, type, title, message, case_id } = req.body;
+    const { v4: uuid } = await import('uuid');
+    const id = uuid();
+    await pool.query(
+      'INSERT INTO notifications (id, user_id, type, title, message, case_id) VALUES ($1,$2,$3,$4,$5,$6)',
+      [id, user_id, type, title, message, case_id || null]);
+    res.status(201).json({ ok: true });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 export default router;

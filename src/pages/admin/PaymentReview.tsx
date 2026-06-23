@@ -5,7 +5,7 @@ import {
   Loader2, ExternalLink, Hash, DollarSign, Clock, User, Filter
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { supabase } from '@/lib/supabase';
+import { admin } from '@/lib/client';
 import { useAuth } from '@/hooks/useAuth';
 import { formatCurrency, formatDateTime, cn } from '@/lib/utils';
 import { toast } from 'sonner';
@@ -47,32 +47,25 @@ export default function PaymentReview() {
   const [expandedId, setExpandedId] = useState<string | null>(null);
 
   const fetchCases = useCallback(async () => {
-    // Fetch cases that have a payment_submitted_at (proof submitted by buyer)
-    const { data, error } = await supabase
-      .from('escrow_cases')
-      .select(`
-        id, case_number, listing_title, buyer_id, seller_id,
-        amount, currency, status,
-        payment_method, payment_reference, payment_amount_sent,
-        payment_proof_url, payment_submitted_at,
-        payment_verified_at, payment_rejected_at, payment_admin_notes,
-        payment_network, payment_address,
-        buyer:user_profiles!escrow_cases_buyer_id_fkey(id, username),
-        seller:user_profiles!escrow_cases_seller_id_fkey(id, username)
-      `)
-      .not('payment_submitted_at', 'is', null)
-      .order('payment_submitted_at', { ascending: false });
+    let allCases: any[];
+    try {
+      allCases = await admin.escrow.list();
+    } catch {
+      toast.error('Failed to load payment reviews');
+      return;
+    }
 
-    if (error) { toast.error('Failed to load payment reviews'); return; }
+    // Filter to cases with payment_submitted_at
+    const filtered = (allCases || []).filter((c: any) => c.payment_submitted_at);
 
-    setCases((data || []).map((c: any) => ({
+    setCases(filtered.map((c: any) => ({
       id: c.id,
       caseNumber: c.case_number,
       listingTitle: c.listing_title,
       buyerId: c.buyer_id,
-      buyerName: c.buyer?.username || 'Unknown',
+      buyerName: c.buyer_name || 'Unknown',
       sellerId: c.seller_id,
-      sellerName: c.seller?.username || 'Unknown',
+      sellerName: c.seller_name || 'Unknown',
       amount: Number(c.amount),
       currency: c.currency || 'USD',
       status: c.status,
@@ -104,53 +97,40 @@ export default function PaymentReview() {
   const handleVerify = async (c: PaymentCase) => {
     setProcessingId(c.id);
 
-    const { error } = await supabase.from('escrow_cases').update({
-      status: 'payment_verified',
-      payment_verified_at: new Date().toISOString(),
-      payment_admin_notes: rejectNotes[c.id] || null,
-      updated_at: new Date().toISOString(),
-    }).eq('id', c.id);
+    try {
+      await admin.escrow.update(c.id, {
+        status: 'payment_verified',
+        payment_verified_at: new Date().toISOString(),
+        payment_admin_notes: rejectNotes[c.id] || null,
+        updated_at: new Date().toISOString(),
+      });
+    } catch (err: any) {
+      toast.error('Failed to verify: ' + err.message);
+      setProcessingId(null);
+      return;
+    }
 
-    if (error) { toast.error('Failed to verify: ' + error.message); setProcessingId(null); return; }
+    // Timeline event via direct API call
+    const token = localStorage.getItem('auth_token');
+    const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+    if (token) headers['Authorization'] = `Bearer ${token}`;
+    const api = (path: string, body: any) => fetch(`/api${path}`, { method: 'POST', headers, body: JSON.stringify(body) });
 
-    // Timeline event
-    await supabase.from('escrow_timeline').insert({
-      case_id: c.id,
+    await api('/escrow/timeline', {
+      caseId: c.id,
       status: 'payment_verified',
       label: 'Payment Verified by Administrator',
-      timestamp: new Date().toISOString(),
-      actor_name: adminUser?.username || 'Admin',
-      actor_role: 'admin',
+      actorName: adminUser?.username || 'Admin',
+      actorRole: 'admin',
       notes: rejectNotes[c.id] || null,
     });
 
-    // Notify seller
-    await supabase.from('notifications').insert({
-      user_id: c.sellerId,
-      type: 'payment_verified',
-      title: 'Payment Verified',
-      message: `Payment for "${c.listingTitle}" has been verified. Please prepare your item and submit evidence.`,
-      case_id: c.id,
-    });
+    // Notify seller & buyer via direct API
+    await api('/notifications', { user_id: c.sellerId, type: 'payment_verified', title: 'Payment Verified', message: `Payment for "${c.listingTitle}" has been verified. Please prepare your item and submit evidence.`, case_id: c.id });
+    await api('/notifications', { user_id: c.buyerId, type: 'payment_verified', title: 'Your Payment Was Verified', message: `Your payment for "${c.listingTitle}" has been verified. The seller has been notified.`, case_id: c.id });
 
-    // Notify buyer
-    await supabase.from('notifications').insert({
-      user_id: c.buyerId,
-      type: 'payment_verified',
-      title: 'Your Payment Was Verified',
-      message: `Your payment for "${c.listingTitle}" has been verified. The seller has been notified.`,
-      case_id: c.id,
-    });
-
-    // Audit log
-    await supabase.from('audit_logs').insert({
-      admin_id: adminUser?.id,
-      admin_name: adminUser?.username || 'Admin',
-      action: 'verify_payment',
-      entity_type: 'escrow_case',
-      entity_id: c.id,
-      details: `Payment verified for case ${c.caseNumber} — ${formatCurrency(c.amount, c.currency)}`,
-    });
+    // Audit log via direct API
+    await api('/admin/audit-logs', { admin_id: adminUser?.id, admin_name: adminUser?.username || 'Admin', action: 'verify_payment', entity_type: 'escrow_case', entity_id: c.id, details: `Payment verified for case ${c.caseNumber} — ${formatCurrency(c.amount, c.currency)}` });
 
     toast.success(`Payment verified for ${c.caseNumber}`);
     setProcessingId(null);
@@ -163,47 +143,35 @@ export default function PaymentReview() {
 
     setProcessingId(c.id);
 
-    const { error } = await supabase.from('escrow_cases').update({
-      status: 'awaiting_payment',
-      payment_rejected_at: new Date().toISOString(),
-      payment_admin_notes: notes,
-      // Clear submission so buyer can resubmit
-      payment_submitted_at: null,
-      payment_proof_url: null,
-      payment_reference: null,
-      payment_amount_sent: null,
-      updated_at: new Date().toISOString(),
-    }).eq('id', c.id);
+    try {
+      await admin.escrow.update(c.id, {
+        status: 'awaiting_payment',
+        payment_admin_notes: notes,
+        payment_submitted_at: null,
+        payment_proof_url: null,
+        payment_reference: null,
+        payment_amount_sent: null,
+        updated_at: new Date().toISOString(),
+      });
+    } catch (err: any) {
+      toast.error('Failed to reject: ' + err.message);
+      setProcessingId(null);
+      return;
+    }
 
-    if (error) { toast.error('Failed to reject: ' + error.message); setProcessingId(null); return; }
+    const token = localStorage.getItem('auth_token');
+    const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+    if (token) headers['Authorization'] = `Bearer ${token}`;
+    const api = (path: string, body: any) => fetch(`/api${path}`, { method: 'POST', headers, body: JSON.stringify(body) });
 
-    await supabase.from('escrow_timeline').insert({
-      case_id: c.id,
-      status: 'awaiting_payment',
-      label: 'Payment Rejected by Administrator',
-      timestamp: new Date().toISOString(),
-      actor_name: adminUser?.username || 'Admin',
-      actor_role: 'admin',
-      notes,
-    });
+    // Timeline
+    await api('/escrow/timeline', { caseId: c.id, status: 'awaiting_payment', label: 'Payment Rejected by Administrator', actorName: adminUser?.username || 'Admin', actorRole: 'admin', notes });
 
     // Notify buyer
-    await supabase.from('notifications').insert({
-      user_id: c.buyerId,
-      type: 'payment_rejected',
-      title: 'Payment Rejected',
-      message: `Your payment proof for "${c.listingTitle}" was rejected. Reason: ${notes}. Please resubmit.`,
-      case_id: c.id,
-    });
+    await api('/notifications', { user_id: c.buyerId, type: 'payment_rejected', title: 'Payment Rejected', message: `Your payment proof for "${c.listingTitle}" was rejected. Reason: ${notes}. Please resubmit.`, case_id: c.id });
 
-    await supabase.from('audit_logs').insert({
-      admin_id: adminUser?.id,
-      admin_name: adminUser?.username || 'Admin',
-      action: 'reject_payment',
-      entity_type: 'escrow_case',
-      entity_id: c.id,
-      details: `Payment rejected for case ${c.caseNumber} — Reason: ${notes}`,
-    });
+    // Audit log
+    await api('/admin/audit-logs', { admin_id: adminUser?.id, admin_name: adminUser?.username || 'Admin', action: 'reject_payment', entity_type: 'escrow_case', entity_id: c.id, details: `Payment rejected for case ${c.caseNumber} — Reason: ${notes}` });
 
     toast.error(`Payment rejected for ${c.caseNumber}`);
     setRejectNotes(prev => { const next = { ...prev }; delete next[c.id]; return next; });

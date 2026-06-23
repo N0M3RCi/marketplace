@@ -5,9 +5,9 @@ import {
   Plus, Minus, AlertTriangle, CheckCircle, X, Hash
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { supabase } from '@/lib/supabase';
+import { admin } from '@/lib/client';
 import { useAuth } from '@/hooks/useAuth';
-import { formatCurrency, formatDateTime, formatRelativeTime, getInitials, cn } from '@/lib/utils';
+import { formatCurrency, formatDateTime, getInitials, cn } from '@/lib/utils';
 import { toast } from 'sonner';
 
 interface AdminWallet {
@@ -29,8 +29,6 @@ interface WalletTx {
   currency: string;
   status: string;
   description: string;
-  referenceId?: string;
-  balanceAfter?: number;
   createdAt: string;
 }
 
@@ -66,38 +64,37 @@ export default function AdminWallets() {
   const [adjustForm, setAdjustForm] = useState<AdjustForm>({ type: 'credit', amount: '', description: '' });
   const [adjustLoading, setAdjustLoading] = useState(false);
 
+  const authHeaders = (): Record<string, string> => {
+    const t = localStorage.getItem('auth_token');
+    const h: Record<string, string> = { 'Content-Type': 'application/json' };
+    if (t) h['Authorization'] = `Bearer ${t}`;
+    return h;
+  };
+
   const fetchWallets = useCallback(async () => {
-    const { data, error } = await supabase
-      .from('wallets')
-      .select(`
-        id, user_id, balance, pending_balance, currency, updated_at,
-        user:user_profiles!wallets_user_id_fkey(id, username, email)
-      `)
-      .order('balance', { ascending: false });
+    try {
+      const data = await admin.wallets.list();
+      const allTxs = await admin.wallets.transactions();
 
-    if (error) { toast.error('Failed to load wallets'); return; }
+      const countMap: Record<string, number> = {};
+      (allTxs || []).forEach((t: any) => {
+        countMap[t.wallet_id] = (countMap[t.wallet_id] || 0) + 1;
+      });
 
-    // Fetch transaction counts
-    const { data: txCounts } = await supabase
-      .from('wallet_transactions')
-      .select('wallet_id');
-
-    const countMap: Record<string, number> = {};
-    (txCounts || []).forEach((t: any) => {
-      countMap[t.wallet_id] = (countMap[t.wallet_id] || 0) + 1;
-    });
-
-    setWallets((data || []).map((w: any) => ({
-      id: w.id,
-      userId: w.user_id,
-      username: w.user?.username || 'Unknown',
-      email: w.user?.email || '',
-      balance: Number(w.balance || 0),
-      pendingBalance: Number(w.pending_balance || 0),
-      currency: w.currency || 'USD',
-      updatedAt: w.updated_at,
-      transactionCount: countMap[w.id] || 0,
-    })));
+      setWallets((data || []).map((w: any) => ({
+        id: w.id,
+        userId: w.user_id,
+        username: w.username || 'Unknown',
+        email: w.email || '',
+        balance: Number(w.balance || 0),
+        pendingBalance: Number(w.pending_balance || 0),
+        currency: w.currency || 'USD',
+        updatedAt: w.updated_at,
+        transactionCount: countMap[w.id] || 0,
+      })));
+    } catch {
+      toast.error('Failed to load wallets');
+    }
   }, []);
 
   useEffect(() => {
@@ -113,29 +110,25 @@ export default function AdminWallets() {
   };
 
   const fetchTxForWallet = async (walletId: string) => {
-    if (txMap[walletId]) return; // cached
+    if (txMap[walletId]) return;
     setTxLoading(walletId);
-    const { data } = await supabase
-      .from('wallet_transactions')
-      .select('*')
-      .eq('wallet_id', walletId)
-      .order('created_at', { ascending: false })
-      .limit(30);
-
-    setTxMap(prev => ({
-      ...prev,
-      [walletId]: (data || []).map((t: any) => ({
-        id: t.id,
-        type: t.type,
-        amount: Number(t.amount),
-        currency: t.currency || 'USD',
-        status: t.status,
-        description: t.description || '',
-        referenceId: t.reference_id,
-        balanceAfter: t.balance_after ? Number(t.balance_after) : undefined,
-        createdAt: t.created_at,
-      })),
-    }));
+    try {
+      const data = await admin.wallets.walletTransactions(walletId);
+      setTxMap(prev => ({
+        ...prev,
+        [walletId]: (data || []).map((t: any) => ({
+          id: t.id,
+          type: t.type,
+          amount: Number(t.amount),
+          currency: t.currency || 'USD',
+          status: t.status,
+          description: t.description || '',
+          createdAt: t.created_at,
+        })),
+      }));
+    } catch {
+      setTxMap(prev => ({ ...prev, [walletId]: [] }));
+    }
     setTxLoading(null);
   };
 
@@ -168,40 +161,53 @@ export default function AdminWallets() {
       ? wallet.balance + amount
       : wallet.balance - amount;
 
-    const { error: walletError } = await supabase.from('wallets').update({
-      balance: newBalance,
-      updated_at: new Date().toISOString(),
-    }).eq('id', adjustingId);
+    try {
+      await admin.wallets.update(adjustingId, newBalance, wallet.pendingBalance);
+    } catch {
+      toast.error('Failed to update wallet');
+      setAdjustLoading(false);
+      return;
+    }
 
-    if (walletError) { toast.error('Failed to update wallet'); setAdjustLoading(false); return; }
-
+    // Create wallet transaction via direct fetch
     const txType = adjustForm.type === 'credit' ? 'admin_credit' : 'admin_debit';
-    await supabase.from('wallet_transactions').insert({
-      wallet_id: adjustingId,
-      user_id: wallet.userId,
-      type: txType,
-      amount,
-      currency: wallet.currency,
-      status: 'completed',
-      description: adjustForm.description.trim(),
-      balance_after: newBalance,
-    });
+    try {
+      await fetch('/api/admin/wallet-transactions', {
+        method: 'POST',
+        headers: authHeaders(),
+        body: JSON.stringify({
+          wallet_id: adjustingId,
+          type: txType,
+          amount,
+          currency: wallet.currency,
+          status: 'completed',
+          description: adjustForm.description.trim(),
+          balance_after: newBalance,
+        }),
+      });
+    } catch { /* tx log silently */ }
 
-    await supabase.from('audit_logs').insert({
-      admin_id: adminUser?.id,
-      admin_name: adminUser?.username || 'Admin',
-      action: `wallet_${adjustForm.type}`,
-      entity_type: 'wallet',
-      entity_id: adjustingId,
-      details: `${adjustForm.type === 'credit' ? 'Credited' : 'Debited'} ${formatCurrency(amount)} ${adjustForm.type === 'credit' ? 'to' : 'from'} ${wallet.username}'s wallet. Reason: ${adjustForm.description}`,
-    });
+    // Audit log
+    try {
+      await fetch('/api/admin/audit-logs', {
+        method: 'POST',
+        headers: authHeaders(),
+        body: JSON.stringify({
+          admin_id: adminUser?.id,
+          admin_name: adminUser?.username || 'Admin',
+          action: `wallet_${adjustForm.type}`,
+          entity_type: 'wallet',
+          entity_id: adjustingId,
+          details: `${adjustForm.type === 'credit' ? 'Credited' : 'Debited'} ${formatCurrency(amount)} ${adjustForm.type === 'credit' ? 'to' : 'from'} ${wallet.username}'s wallet. Reason: ${adjustForm.description}`,
+        }),
+      });
+    } catch { /* audit log silently */ }
 
     toast.success(`${formatCurrency(amount)} ${adjustForm.type === 'credit' ? 'credited to' : 'debited from'} ${wallet.username}'s wallet`);
     setAdjustingId(null);
     setAdjustForm({ type: 'credit', amount: '', description: '' });
     setAdjustLoading(false);
 
-    // Refresh data and clear tx cache for this wallet
     await fetchWallets();
     setTxMap(prev => { const next = { ...prev }; delete next[adjustingId!]; return next; });
   };
@@ -232,11 +238,12 @@ export default function AdminWallets() {
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="font-heading text-2xl font-bold text-foreground">Wallet Management</h1>
-          <p className="text-muted-foreground text-sm mt-1">View balances, transaction history, and manually adjust wallets</p>
+          <h1 className="font-heading text-2xl font-bold" style={{ color: '#2A1A00' }}>Wallet Management</h1>
+          <p className="text-sm mt-1" style={{ color: '#9A7C40' }}>View balances, transaction history, and manually adjust wallets</p>
         </div>
         <button onClick={handleRefresh} disabled={refreshing}
-          className="p-2 rounded-lg border border-border text-muted-foreground hover:text-foreground hover:bg-muted transition-colors">
+          className="p-2 rounded-lg border transition-colors"
+          style={{ border: '1px solid rgba(200,160,60,0.25)', color: '#9A7C40' }}>
           <RefreshCw className={cn('w-4 h-4', refreshing && 'animate-spin')} />
         </button>
       </div>
@@ -451,9 +458,6 @@ export default function AdminWallets() {
                               <p className={cn('text-xs font-bold', cfg.color)}>
                                 {cfg.sign}{formatCurrency(tx.amount, tx.currency)}
                               </p>
-                              {tx.balanceAfter !== undefined && (
-                                <p className="text-[10px] text-muted-foreground">→ {formatCurrency(tx.balanceAfter)}</p>
-                              )}
                             </div>
                             <div className="text-right flex-shrink-0 hidden sm:block">
                               <p className="text-[11px] text-muted-foreground">{formatDateTime(tx.createdAt).split(',')[0]}</p>

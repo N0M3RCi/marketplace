@@ -6,7 +6,7 @@ import {
   X, ExternalLink, Image as ImageIcon, ToggleLeft, ToggleRight, AlertTriangle, Plus, Upload, ChevronDown
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { supabase } from '@/lib/supabase';
+import { admin, listings as listingsClient, storage as storageClient, categories as categoriesClient } from '@/lib/client';
 import { useAuth } from '@/hooks/useAuth';
 import { formatCurrency, formatDate, cn } from '@/lib/utils';
 import { toast } from 'sonner';
@@ -75,58 +75,83 @@ export default function AdminListings() {
   const createFileRef = useRef<HTMLInputElement>(null);
 
   const fetchSellers = useCallback(async () => {
-    const { data } = await supabase
-      .from('user_profiles')
-      .select('id, username, email')
-      .order('username');
-    setSellers((data || []).map((u: any) => ({ id: u.id, username: u.username || u.email?.split('@')[0] || 'Unknown', email: u.email })));
+    try {
+      const data = await admin.users.list();
+      setSellers((data || []).map((u: any) => ({
+        id: u.id,
+        username: u.username || u.email?.split('@')[0] || 'Unknown',
+        email: u.email,
+      })));
+    } catch {
+      setSellers([]);
+    }
   }, []);
 
   const fetchCategories = useCallback(async () => {
-    const { data } = await supabase.from('categories').select('id, name').order('name');
-    setCategories((data || []).map((c: any) => ({ id: c.id, name: c.name })));
+    try {
+      const data = await categoriesClient.list();
+      setCategories((data || []).map((c: any) => ({ id: c.id, name: c.name })));
+    } catch {
+      setCategories([]);
+    }
   }, []);
 
   const fetchListings = useCallback(async () => {
-    const { data, error } = await supabase
-      .from('listings')
-      .select(`
-        id, title, description, price, currency, condition, location,
-        status, images, view_count, category_id, created_at, updated_at,
-        seller:user_profiles!listings_seller_id_fkey(id, username, email),
-        category:categories!listings_category_id_fkey(name)
-      `)
-      .order('created_at', { ascending: false });
-
-    if (error) { toast.error('Failed to load listings'); return; }
-
-    setListings((data || []).map((l: any) => ({
-      id: l.id,
-      title: l.title,
-      description: l.description || '',
-      price: Number(l.price),
-      currency: l.currency || 'USD',
-      condition: l.condition || 'good',
-      location: l.location || '',
-      status: l.status || 'active',
-      images: l.images || [],
-      viewCount: l.view_count || 0,
-      categoryName: l.category?.name || 'Uncategorized',
-      categoryId: l.category_id,
-      sellerId: l.seller?.id || '',
-      sellerName: l.seller?.username || 'Unknown',
-      sellerEmail: l.seller?.email || '',
-      createdAt: l.created_at,
-      updatedAt: l.updated_at,
-    })));
+    try {
+      const data = await admin.listings.list();
+      setListings((data || []).map((l: any) => ({
+        id: l.id,
+        title: l.title,
+        description: l.description || '',
+        price: Number(l.price),
+        currency: l.currency || 'USD',
+        condition: l.condition || 'good',
+        location: l.location || '',
+        status: l.status || 'active',
+        images: l.images || [],
+        viewCount: l.view_count || 0,
+        categoryName: l.category_name || l.category_name || 'Uncategorized',
+        categoryId: l.category_id,
+        sellerId: l.seller_id || '',
+        sellerName: l.seller_name || 'Unknown',
+        sellerEmail: '',
+        createdAt: l.created_at,
+        updatedAt: l.updated_at,
+      })));
+    } catch {
+      toast.error('Failed to load listings');
+    }
   }, []);
 
   useEffect(() => {
     setLoading(true);
-    fetchListings().finally(() => setLoading(false));
-    fetchSellers();
-    fetchCategories();
+    Promise.all([fetchListings(), fetchSellers(), fetchCategories()]).finally(() => setLoading(false));
   }, [fetchListings, fetchSellers, fetchCategories]);
+
+  const token = () => localStorage.getItem('auth_token');
+  const authHeaders = (): Record<string, string> => {
+    const t = token();
+    const h: Record<string, string> = { 'Content-Type': 'application/json' };
+    if (t) h['Authorization'] = `Bearer ${t}`;
+    return h;
+  };
+
+  const logAudit = async (action: string, entityType: string, entityId: string, details: string) => {
+    try {
+      await fetch('/api/admin/audit-logs', {
+        method: 'POST',
+        headers: authHeaders(),
+        body: JSON.stringify({
+          admin_id: user?.id,
+          admin_name: user?.username || 'Admin',
+          action,
+          entity_type: entityType,
+          entity_id: entityId,
+          details,
+        }),
+      });
+    } catch { /* audit log silently */ }
+  };
 
   const handleCreateImagePick = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []).filter(f => f.size <= 10 * 1024 * 1024).slice(0, 8);
@@ -151,44 +176,40 @@ export default function AdminListings() {
     if (createForm.images.length > 0) {
       setUploadingCreate(true);
       for (const file of createForm.images) {
-        const ext = file.name.split('.').pop();
-        const path = `${createForm.sellerId}/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
-        const { error: upErr } = await supabase.storage.from('listing-images').upload(path, file, { upsert: false });
-        if (!upErr) {
-          const { data } = supabase.storage.from('listing-images').getPublicUrl(path);
-          uploadedUrls.push(data.publicUrl);
+        try {
+          const result = await storageClient.upload(file);
+          uploadedUrls.push(result.url);
+        } catch {
+          toast.error('Image upload failed');
         }
       }
       setUploadingCreate(false);
     }
 
-    const { error } = await supabase.from('listings').insert({
-      title: createForm.title.trim(),
-      description: createForm.description.trim(),
-      price: Number(createForm.price),
-      currency: createForm.currency,
-      category_id: createForm.categoryId || null,
-      seller_id: createForm.sellerId,
-      images: uploadedUrls,
-      condition: createForm.condition,
-      location: createForm.location.trim(),
-      status: 'active',
-    });
+    try {
+      await listingsClient.create({
+        title: createForm.title.trim(),
+        description: createForm.description.trim(),
+        price: Number(createForm.price),
+        currency: createForm.currency,
+        category_id: createForm.categoryId || null,
+        seller_id: createForm.sellerId,
+        images: uploadedUrls,
+        condition: createForm.condition,
+        location: createForm.location.trim(),
+        status: 'active',
+      });
 
-    if (error) { toast.error('Failed to create: ' + error.message); setCreating(false); return; }
+      await logAudit('create_listing', 'listing', '',
+        `Created listing "${createForm.title}" for seller ${sellers.find(s => s.id === createForm.sellerId)?.username || createForm.sellerId}`);
 
-    await supabase.from('audit_logs').insert({
-      admin_id: user?.id,
-      admin_name: user?.username || 'Admin',
-      action: 'create_listing',
-      entity_type: 'listing',
-      details: `Created listing "${createForm.title}" for seller ${sellers.find(s => s.id === createForm.sellerId)?.username || createForm.sellerId}`,
-    });
-
-    toast.success('Listing created successfully');
-    setShowCreateModal(false);
-    setCreateForm({ title: '', description: '', price: '', currency: 'USD', categoryId: '', condition: 'good', location: '', sellerId: '', images: [], imageUrls: [] });
-    await fetchListings();
+      toast.success('Listing created successfully');
+      setShowCreateModal(false);
+      setCreateForm({ title: '', description: '', price: '', currency: 'USD', categoryId: '', condition: 'good', location: '', sellerId: '', images: [], imageUrls: [] });
+      await fetchListings();
+    } catch (err: any) {
+      toast.error('Failed to create: ' + (err.message || 'Unknown error'));
+    }
     setCreating(false);
   };
 
@@ -222,69 +243,53 @@ export default function AdminListings() {
     if (isNaN(price) || price <= 0) { toast.error('Enter a valid price'); return; }
 
     setSaving(true);
-    const { error } = await supabase.from('listings').update({
-      title: editForm.title.trim(),
-      description: editForm.description.trim(),
-      price,
-      condition: editForm.condition,
-      location: editForm.location.trim(),
-      status: editForm.status,
-      updated_at: new Date().toISOString(),
-    }).eq('id', listingId);
+    try {
+      await admin.listings.update(listingId, {
+        title: editForm.title.trim(),
+        description: editForm.description.trim(),
+        price,
+        condition: editForm.condition,
+        location: editForm.location.trim(),
+        status: editForm.status,
+      });
 
-    if (error) { toast.error('Failed to save: ' + error.message); setSaving(false); return; }
+      await logAudit('edit_listing', 'listing', listingId,
+        `Updated listing "${editForm.title}" — price: ${formatCurrency(price)}, status: ${editForm.status}`);
 
-    // Log to audit_logs
-    await supabase.from('audit_logs').insert({
-      admin_id: user?.id,
-      admin_name: user?.username || 'Admin',
-      action: 'edit_listing',
-      entity_type: 'listing',
-      entity_id: listingId,
-      details: `Updated listing "${editForm.title}" — price: ${formatCurrency(price)}, status: ${editForm.status}`,
-    });
-
-    toast.success('Listing updated successfully');
-    setEditingId(null);
-    await fetchListings();
+      toast.success('Listing updated successfully');
+      setEditingId(null);
+      await fetchListings();
+    } catch (err: any) {
+      toast.error('Failed to save: ' + (err.message || 'Unknown error'));
+    }
     setSaving(false);
   };
 
   const toggleStatus = async (listing: AdminListing) => {
     const newStatus = listing.status === 'active' ? 'inactive' : 'active';
-    const { error } = await supabase.from('listings').update({ status: newStatus, updated_at: new Date().toISOString() }).eq('id', listing.id);
-    if (error) { toast.error('Failed to update status'); return; }
-
-    await supabase.from('audit_logs').insert({
-      admin_id: user?.id,
-      admin_name: user?.username || 'Admin',
-      action: 'toggle_listing_status',
-      entity_type: 'listing',
-      entity_id: listing.id,
-      details: `Changed listing "${listing.title}" status to ${newStatus}`,
-    });
-
-    toast.success(`Listing ${newStatus === 'active' ? 'activated' : 'deactivated'}`);
-    await fetchListings();
+    try {
+      await admin.listings.update(listing.id, { status: newStatus });
+      await logAudit('toggle_listing_status', 'listing', listing.id,
+        `Changed listing "${listing.title}" status to ${newStatus}`);
+      toast.success(`Listing ${newStatus === 'active' ? 'activated' : 'deactivated'}`);
+      await fetchListings();
+    } catch {
+      toast.error('Failed to update status');
+    }
   };
 
   const handleDelete = async (listingId: string) => {
     setDeletingId(listingId);
     const listing = listings.find(l => l.id === listingId);
-    const { error } = await supabase.from('listings').delete().eq('id', listingId);
-    if (error) { toast.error('Failed to delete listing'); setDeletingId(null); return; }
-
-    await supabase.from('audit_logs').insert({
-      admin_id: user?.id,
-      admin_name: user?.username || 'Admin',
-      action: 'delete_listing',
-      entity_type: 'listing',
-      entity_id: listingId,
-      details: `Deleted listing "${listing?.title}"`,
-    });
-
-    toast.success('Listing deleted');
-    setConfirmDeleteId(null);
+    try {
+      await admin.listings.delete(listingId);
+      await logAudit('delete_listing', 'listing', listingId,
+        `Deleted listing "${listing?.title}"`);
+      toast.success('Listing deleted');
+      setConfirmDeleteId(null);
+    } catch {
+      toast.error('Failed to delete listing');
+    }
     setDeletingId(null);
     await fetchListings();
   };
@@ -313,21 +318,21 @@ export default function AdminListings() {
     <div className="p-6 lg:p-8">
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="font-heading text-2xl font-bold text-foreground">Listing Management</h1>
-          <p className="text-muted-foreground text-sm mt-1">Edit, moderate, and manage all marketplace listings</p>
+          <h1 className="font-heading text-2xl font-bold" style={{ color: '#2A1A00' }}>Listing Management</h1>
+          <p className="text-sm mt-1" style={{ color: '#9A7C40' }}>Edit, moderate, and manage all marketplace listings</p>
         </div>
         <div className="flex items-center gap-2">
           <button
             onClick={() => setShowCreateModal(true)}
             className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-semibold transition-all"
-            style={{ background: 'rgba(255,224,0,0.18)', border: '1px solid rgba(255,224,0,0.32)', color: '#FFE000' }}
-            onMouseEnter={e => (e.currentTarget as HTMLElement).style.background = 'rgba(255,224,0,0.28)'}
-            onMouseLeave={e => (e.currentTarget as HTMLElement).style.background = 'rgba(255,224,0,0.18)'}>
+            style={{ background: '#C68000', color: '#FFF8E5', border: 'none' }}
+            onMouseEnter={e => (e.currentTarget as HTMLElement).style.background = '#A66800'}
+            onMouseLeave={e => (e.currentTarget as HTMLElement).style.background = '#C68000'}>
             <Plus className="w-4 h-4" /> Add Listing
           </button>
           <button onClick={handleRefresh} disabled={refreshing}
-            className="p-2 rounded-lg transition-colors"
-            style={{ border: '1px solid rgba(255,255,255,0.10)', color: 'rgba(255,255,255,0.50)' }}>
+            className="p-2 rounded-lg border transition-colors"
+            style={{ border: '1px solid rgba(200,160,60,0.25)', color: '#9A7C40' }}>
             <RefreshCw className={cn('w-4 h-4', refreshing && 'animate-spin')} />
           </button>
         </div>
@@ -425,7 +430,6 @@ export default function AdminListings() {
                             </div>
                             <p className="text-xs text-muted-foreground mt-1">
                               Seller: <span className="font-medium text-foreground">{listing.sellerName}</span>
-                              <span className="text-muted-foreground/60"> ({listing.sellerEmail})</span>
                             </p>
                           </div>
                           <div className="text-right flex-shrink-0">
@@ -534,15 +538,15 @@ export default function AdminListings() {
 
       {/* Create Listing Modal */}
       {showCreateModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ backdropFilter: 'blur(8px)', background: 'rgba(0,0,0,0.75)' }}>
-          <div className="w-full max-w-2xl rounded-2xl overflow-hidden max-h-[90vh] flex flex-col" style={{ background: '#0c0c0c', border: '1px solid rgba(255,224,0,0.18)', boxShadow: '0 32px 100px rgba(0,0,0,0.90)' }}>
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ backdropFilter: 'blur(8px)', background: 'rgba(0,0,0,0.50)' }}>
+          <div className="w-full max-w-2xl rounded-2xl overflow-hidden max-h-[90vh] flex flex-col bg-white shadow-2xl border border-border">
             {/* Modal Header */}
-            <div className="flex items-center justify-between px-6 py-4 flex-shrink-0" style={{ borderBottom: '1px solid rgba(255,255,255,0.07)', background: 'rgba(255,224,0,0.08)' }}>
+            <div className="flex items-center justify-between px-6 py-4 flex-shrink-0 border-b border-border" style={{ background: '#FFFDF5' }}>
               <div>
-                <h2 className="font-heading font-bold" style={{ color: 'rgba(255,255,255,0.92)' }}>Create New Listing</h2>
-                <p className="text-xs mt-0.5" style={{ color: 'rgba(255,255,255,0.40)' }}>Add a listing on behalf of any seller</p>
+                <h2 className="font-heading font-bold" style={{ color: '#2A1A00' }}>Create New Listing</h2>
+                <p className="text-xs mt-0.5" style={{ color: '#9A7C40' }}>Add a listing on behalf of any seller</p>
               </div>
-              <button onClick={() => setShowCreateModal(false)} className="p-1.5 rounded-lg transition-colors" style={{ color: 'rgba(255,255,255,0.45)' }}>
+              <button onClick={() => setShowCreateModal(false)} className="p-1.5 rounded-lg transition-colors hover:bg-muted" style={{ color: '#9A7C40' }}>
                 <X className="w-4 h-4" />
               </button>
             </div>
@@ -551,66 +555,64 @@ export default function AdminListings() {
             <div className="p-6 overflow-y-auto space-y-4">
               {/* Seller Selector */}
               <div>
-                <label className="block text-xs font-semibold mb-1.5" style={{ color: 'rgba(255,255,255,0.55)' }}>Seller <span style={{ color: '#ef4444' }}>*</span></label>
+                <label className="block text-xs font-semibold mb-1.5" style={{ color: '#6B5D3D' }}>Seller <span className="text-red-500">*</span></label>
                 <select
                   value={createForm.sellerId}
                   onChange={e => setCreateForm(f => ({ ...f, sellerId: e.target.value }))}
-                  className="w-full px-3 py-2.5 text-sm rounded-xl focus:outline-none"
-                  style={{ background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.12)', color: 'rgba(255,255,255,0.85)' }}>
-                  <option value="" style={{ background: '#111' }}>Select a seller...</option>
+                  className="w-full px-3 py-2.5 text-sm border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-[hsl(var(--brand-navy))] bg-white"
+                  style={{ color: '#2A1A00' }}>
+                  <option value="">Select a seller...</option>
                   {sellers.map(s => (
-                    <option key={s.id} value={s.id} style={{ background: '#111' }}>
-                      {s.username} ({s.email})
-                    </option>
+                    <option key={s.id} value={s.id}>{s.username} ({s.email})</option>
                   ))}
                 </select>
               </div>
 
               {/* Title */}
               <div>
-                <label className="block text-xs font-semibold mb-1.5" style={{ color: 'rgba(255,255,255,0.55)' }}>Title <span style={{ color: '#ef4444' }}>*</span></label>
+                <label className="block text-xs font-semibold mb-1.5" style={{ color: '#6B5D3D' }}>Title <span className="text-red-500">*</span></label>
                 <input
                   value={createForm.title}
                   onChange={e => setCreateForm(f => ({ ...f, title: e.target.value }))}
                   placeholder="e.g. Apple MacBook Pro 16-inch M3"
-                  className="w-full px-3 py-2.5 text-sm rounded-xl focus:outline-none"
-                  style={{ background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.12)', color: 'rgba(255,255,255,0.85)' }}
+                  className="w-full px-3 py-2.5 text-sm border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-[hsl(var(--brand-navy))] bg-white"
+                  style={{ color: '#2A1A00' }}
                 />
               </div>
 
               {/* Description */}
               <div>
-                <label className="block text-xs font-semibold mb-1.5" style={{ color: 'rgba(255,255,255,0.55)' }}>Description</label>
+                <label className="block text-xs font-semibold mb-1.5" style={{ color: '#6B5D3D' }}>Description</label>
                 <textarea
                   value={createForm.description}
                   onChange={e => setCreateForm(f => ({ ...f, description: e.target.value }))}
                   placeholder="Describe the item in detail..."
                   rows={3}
-                  className="w-full px-3 py-2.5 text-sm rounded-xl focus:outline-none resize-none"
-                  style={{ background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.12)', color: 'rgba(255,255,255,0.85)' }}
+                  className="w-full px-3 py-2.5 text-sm border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-[hsl(var(--brand-navy))] bg-white resize-none"
+                  style={{ color: '#2A1A00' }}
                 />
               </div>
 
               {/* Price + Currency */}
               <div className="grid grid-cols-3 gap-3">
                 <div className="col-span-1">
-                  <label className="block text-xs font-semibold mb-1.5" style={{ color: 'rgba(255,255,255,0.55)' }}>Currency</label>
+                  <label className="block text-xs font-semibold mb-1.5" style={{ color: '#6B5D3D' }}>Currency</label>
                   <select value={createForm.currency} onChange={e => setCreateForm(f => ({ ...f, currency: e.target.value }))}
-                    className="w-full px-3 py-2.5 text-sm rounded-xl focus:outline-none"
-                    style={{ background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.12)', color: 'rgba(255,255,255,0.85)' }}>
-                    {['USD','EUR','GBP','AUD','CAD'].map(c => <option key={c} value={c} style={{ background: '#111' }}>{c}</option>)}
+                    className="w-full px-3 py-2.5 text-sm border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-[hsl(var(--brand-navy))] bg-white"
+                    style={{ color: '#2A1A00' }}>
+                    {['USD','EUR','GBP','AUD','CAD'].map(c => <option key={c} value={c}>{c}</option>)}
                   </select>
                 </div>
                 <div className="col-span-2">
-                  <label className="block text-xs font-semibold mb-1.5" style={{ color: 'rgba(255,255,255,0.55)' }}>Price <span style={{ color: '#ef4444' }}>*</span></label>
+                  <label className="block text-xs font-semibold mb-1.5" style={{ color: '#6B5D3D' }}>Price <span className="text-red-500">*</span></label>
                   <div className="relative">
-                    <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4" style={{ color: 'rgba(255,255,255,0.30)' }} />
+                    <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                     <input type="number" min="1" step="0.01"
                       value={createForm.price}
                       onChange={e => setCreateForm(f => ({ ...f, price: e.target.value }))}
                       placeholder="0.00"
-                      className="w-full pl-9 pr-3 py-2.5 text-sm rounded-xl focus:outline-none"
-                      style={{ background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.12)', color: 'rgba(255,255,255,0.85)' }}
+                      className="w-full pl-9 pr-3 py-2.5 text-sm border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-[hsl(var(--brand-navy))] bg-white"
+                      style={{ color: '#2A1A00' }}
                     />
                   </div>
                 </div>
@@ -619,49 +621,49 @@ export default function AdminListings() {
               {/* Category + Condition */}
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-semibold mb-1.5" style={{ color: 'rgba(255,255,255,0.55)' }}>Category</label>
+                  <label className="block text-xs font-semibold mb-1.5" style={{ color: '#6B5D3D' }}>Category</label>
                   <select value={createForm.categoryId} onChange={e => setCreateForm(f => ({ ...f, categoryId: e.target.value }))}
-                    className="w-full px-3 py-2.5 text-sm rounded-xl focus:outline-none"
-                    style={{ background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.12)', color: 'rgba(255,255,255,0.85)' }}>
-                    <option value="" style={{ background: '#111' }}>Uncategorized</option>
-                    {categories.map(c => <option key={c.id} value={c.id} style={{ background: '#111' }}>{c.name}</option>)}
+                    className="w-full px-3 py-2.5 text-sm border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-[hsl(var(--brand-navy))] bg-white"
+                    style={{ color: '#2A1A00' }}>
+                    <option value="">Uncategorized</option>
+                    {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
                   </select>
                 </div>
                 <div>
-                  <label className="block text-xs font-semibold mb-1.5" style={{ color: 'rgba(255,255,255,0.55)' }}>Condition</label>
+                  <label className="block text-xs font-semibold mb-1.5" style={{ color: '#6B5D3D' }}>Condition</label>
                   <select value={createForm.condition} onChange={e => setCreateForm(f => ({ ...f, condition: e.target.value }))}
-                    className="w-full px-3 py-2.5 text-sm rounded-xl focus:outline-none"
-                    style={{ background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.12)', color: 'rgba(255,255,255,0.85)' }}>
-                    {Object.entries(CONDITION_LABELS).map(([k, v]) => <option key={k} value={k} style={{ background: '#111' }}>{v}</option>)}
+                    className="w-full px-3 py-2.5 text-sm border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-[hsl(var(--brand-navy))] bg-white"
+                    style={{ color: '#2A1A00' }}>
+                    {Object.entries(CONDITION_LABELS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
                   </select>
                 </div>
               </div>
 
               {/* Location */}
               <div>
-                <label className="block text-xs font-semibold mb-1.5" style={{ color: 'rgba(255,255,255,0.55)' }}>Location</label>
+                <label className="block text-xs font-semibold mb-1.5" style={{ color: '#6B5D3D' }}>Location</label>
                 <div className="relative">
-                  <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4" style={{ color: 'rgba(255,255,255,0.30)' }} />
+                  <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                   <input
                     value={createForm.location}
                     onChange={e => setCreateForm(f => ({ ...f, location: e.target.value }))}
                     placeholder="e.g. New York, NY"
-                    className="w-full pl-9 pr-3 py-2.5 text-sm rounded-xl focus:outline-none"
-                    style={{ background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.12)', color: 'rgba(255,255,255,0.85)' }}
+                    className="w-full pl-9 pr-3 py-2.5 text-sm border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-[hsl(var(--brand-navy))] bg-white"
+                    style={{ color: '#2A1A00' }}
                   />
                 </div>
               </div>
 
               {/* Images */}
               <div>
-                <label className="block text-xs font-semibold mb-1.5" style={{ color: 'rgba(255,255,255,0.55)' }}>Photos (up to 8)</label>
+                <label className="block text-xs font-semibold mb-1.5" style={{ color: '#6B5D3D' }}>Photos (up to 8)</label>
                 <div
                   onClick={() => createFileRef.current?.click()}
-                  className="rounded-xl p-5 text-center cursor-pointer transition-all"
-                  style={{ border: '2px dashed rgba(255,224,0,0.20)', background: 'rgba(255,224,0,0.03)' }}>
-                  <Upload className="w-6 h-6 mx-auto mb-2" style={{ color: 'rgba(255,224,0,0.45)' }} />
-                  <p className="text-xs" style={{ color: 'rgba(255,255,255,0.55)' }}>Click to upload images</p>
-                  <p className="text-[11px] mt-0.5" style={{ color: 'rgba(255,255,255,0.30)' }}>{createForm.images.length}/8 added · max 10MB each</p>
+                  className="rounded-xl p-5 text-center cursor-pointer transition-all border-2 border-dashed"
+                  style={{ borderColor: 'rgba(198,128,0,0.25)', background: 'rgba(198,128,0,0.03)' }}>
+                  <Upload className="w-6 h-6 mx-auto mb-2" style={{ color: '#C6800080' }} />
+                  <p className="text-xs" style={{ color: '#6B5D3D' }}>Click to upload images</p>
+                  <p className="text-[11px] mt-0.5" style={{ color: '#9A7C40' }}>{createForm.images.length}/8 added · max 10MB each</p>
                 </div>
                 <input ref={createFileRef} type="file" accept="image/jpeg,image/png,image/webp" multiple onChange={handleCreateImagePick} className="hidden" />
                 {createForm.imageUrls.length > 0 && (
@@ -682,22 +684,22 @@ export default function AdminListings() {
             </div>
 
             {/* Footer */}
-            <div className="flex gap-3 px-6 py-4 flex-shrink-0" style={{ borderTop: '1px solid rgba(255,255,255,0.07)' }}>
+            <div className="flex gap-3 px-6 py-4 flex-shrink-0 border-t border-border" style={{ background: '#FFFDF5' }}>
               <button
                 onClick={handleCreateListing}
                 disabled={creating || uploadingCreate}
                 className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-semibold transition-all"
-                style={{ background: 'rgba(255,224,0,0.18)', border: '1px solid rgba(255,224,0,0.35)', color: '#FFE000' }}
-                onMouseEnter={e => (e.currentTarget as HTMLButtonElement).style.background = 'rgba(255,224,0,0.28)'}
-                onMouseLeave={e => (e.currentTarget as HTMLButtonElement).style.background = 'rgba(255,224,0,0.18)'}>
+                style={{ background: '#C68000', color: '#FFF8E5', border: 'none' }}
+                onMouseEnter={e => (e.currentTarget as HTMLButtonElement).style.background = '#A66800'}
+                onMouseLeave={e => (e.currentTarget as HTMLButtonElement).style.background = '#C68000'}>
                 {creating || uploadingCreate ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle className="w-4 h-4" />}
                 {uploadingCreate ? 'Uploading...' : creating ? 'Creating...' : 'Create Listing'}
               </button>
               <button onClick={() => setShowCreateModal(false)}
-                className="px-5 py-2.5 rounded-xl text-sm transition-all"
-                style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.10)', color: 'rgba(255,255,255,0.60)' }}
-                onMouseEnter={e => (e.currentTarget as HTMLButtonElement).style.background = 'rgba(255,255,255,0.10)'}
-                onMouseLeave={e => (e.currentTarget as HTMLButtonElement).style.background = 'rgba(255,255,255,0.06)'}>
+                className="px-5 py-2.5 rounded-xl text-sm transition-all border"
+                style={{ background: 'white', border: '1px solid rgba(200,160,60,0.25)', color: '#6B5D3D' }}
+                onMouseEnter={e => (e.currentTarget as HTMLButtonElement).style.background = '#FFFDF5'}
+                onMouseLeave={e => (e.currentTarget as HTMLButtonElement).style.background = 'white'}>
                 Cancel
               </button>
             </div>
