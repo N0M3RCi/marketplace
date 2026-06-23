@@ -79,6 +79,11 @@ app.get('/api/health', async (_req, res) => {
   }
 });
 
+// API 404 handler — unmatched API routes return JSON, not HTML
+app.use('/api/*', (_req, res) => {
+  res.status(404).json({ error: 'API endpoint not found' });
+});
+
 // Global error handler — always returns JSON
 app.use((err: any, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
   console.error('Unhandled error:', err);

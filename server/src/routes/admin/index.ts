@@ -189,7 +189,7 @@ router.get('/escrow/:id', async (req: AuthRequest, res) => {
 router.put('/escrow/:id', async (req: AuthRequest, res) => {
   try {
     const sets: string[] = ['updated_at = NOW()']; const vals: any[] = []; let idx = 1;
-    const allowed = ['status','admin_notes','payment_admin_notes','payment_verified_at','payment_rejected_at','payment_submitted_at','payment_proof_url','payment_reference','payment_amount_sent','delivery_status','delivery_notes','dispute_status','dispute_outcome','dispute_admin_notes','dispute_resolved_at','payout_status','courier_name','tracking_number','pickup_date','estimated_delivery_date','actual_delivery_date','delivered_at','seller_evidence_status','seller_evidence_admin_notes','packaging_approved_at','seller_item_photos','seller_packaging_photos','seller_packaging_video','funds_released_at','refunded_at','updated_at'];
+    const allowed = ['status','admin_notes','payment_admin_notes','payment_verified_at','payment_rejected_at','payment_submitted_at','payment_proof_url','payment_reference','payment_amount_sent','delivery_status','delivery_notes','dispute_status','dispute_outcome','dispute_admin_notes','dispute_resolved_at','payout_status','courier_name','tracking_number','pickup_date','estimated_delivery_date','actual_delivery_date','delivered_at','seller_evidence_status','seller_evidence_admin_notes','packaging_approved_at','seller_item_photos','seller_packaging_photos','seller_packaging_video','funds_released_at','refunded_at'];
     for (const f of allowed) { if (req.body[f] !== undefined) { sets.push(`${f} = $${idx++}`); vals.push(req.body[f]); } }
     vals.push(req.params.id);
     await pool.query(`UPDATE escrow_cases SET ${sets.join(',')} WHERE id=$${idx}`, vals);

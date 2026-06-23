@@ -1,13 +1,26 @@
 import pg from 'pg';
 
-const connectionString = process.env.DATABASE_URL || 'postgresql://postgres:postgres@localhost:5432/marketplace';
+const rawConnectionString = process.env.DATABASE_URL;
+const connectionString = rawConnectionString || 'postgresql://postgres:postgres@localhost:5432/marketplace';
+
+// Log connection diagnostic (password masked)
+const masked = connectionString
+  ? connectionString.replace(/\/\/[^:]+:[^@]+@/, '//USER:***@')
+  : '(empty)';
+console.log(`DB config: DATABASE_URL env set: ${!!rawConnectionString}, using: ${masked}`);
+
+if (!rawConnectionString) {
+  console.warn('⚠️  DATABASE_URL environment variable is NOT SET on Railway.');
+  console.warn('   Go to Railway Dashboard → your service → Variables tab.');
+  console.warn('   Verify a PostgreSQL plugin is linked (add one if not, then link it).');
+  console.warn('   DATABASE_URL should auto-populate. If empty, click "New Variable" or re-link the database.');
+}
 
 const pool = new pg.Pool({
   connectionString,
   max: 10,
   idleTimeoutMillis: 30000,
   connectionTimeoutMillis: 5000,
-  // Allow the pool to retry on connection failures
   allowExitOnIdle: false,
 });
 
@@ -43,7 +56,15 @@ export async function queryWithRetry(text: string, params?: any[], retries = 2):
 pool.query('SELECT 1').then(() => {
   console.log('Database connection verified.');
 }).catch((err) => {
-  console.warn('Database not available at startup, will retry on demand:', err.message);
+  console.warn('═══════════════════════════════════════');
+  console.warn('  DATABASE CONNECTION FAILED');
+  console.warn('  Error:', err.code || err.message);
+  console.warn('  This means Railway cannot reach your PostgreSQL database.');
+  console.warn('  ═  Check that a PostgreSQL plugin exists in your Railway project');
+  console.warn('  ═  Verify it is LINKED to your web service (not just in the same project)');
+  console.warn('  ═  Confirm DATABASE_URL has a value in the Variables tab');
+  console.warn('  ═  If all else fails, remove and re-add the PostgreSQL plugin');
+  console.warn('═══════════════════════════════════════');
 });
 
 export default pool;
