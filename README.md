@@ -1,61 +1,290 @@
-# Welcome to your OnSpace project
+# SafeEscrow — Secure Marketplace & Escrow Platform
 
-## How can I edit this code?
+A full-stack escrow marketplace platform that enables **secure peer-to-peer transactions** with a trusted third-party escrow workflow. Buyers and sellers can transact with confidence through a multi-step verification process, real-time messaging, and administrative oversight.
 
-There are several ways of editing your application.
+---
 
-**Use OnSpace**
+## Features
 
-Simply visit the [OnSpace Project]() and start prompting.
+### Escrow Engine
+- Full escrow lifecycle: payment submission → verification → seller packaging evidence → delivery tracking → buyer confirmation → funds release
+- Dispute resolution with admin mediation and evidence uploads
+- Payment method support: **Crypto** (BTC, USDT-TRC20, USDT-ERC20, ETH, SOL, BNB), **Venmo**, **CashApp**, **Zelle**
+- Automatic timeline tracking at every stage
 
-Changes made via OnSpace will be committed automatically to this repo.
+### Marketplace
+- Rich listing creation with images, categories, pricing, and conditions
+- Advanced filtering, search, and category browsing
+- Featured listings with admin-controlled sort order
+- Favorites and watchlist functionality
 
-**Use your preferred IDE**
+### User System
+- JWT-based authentication with email/password
+- Role-based access: `admin`, `buyer`, `seller`, `both`
+- Profile management with avatar uploads
+- Seller verification request workflow
 
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in OnSpace.
+### Messaging
+- Real-time chat via Socket.IO with typing indicators
+- Conversation management with unread tracking
+- File/image attachment support in messages
+- Admin oversight panel
 
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
+### Wallet & Payments
+- User wallets with balance and pending balance tracking
+- Admin-managed payout system
+- Multi-currency support (USD, EUR, GBP, AUD, CAD, JPY, CNY, INR, BRL)
+- Live exchange rate integration
 
-Follow these steps:
+### Admin Panel
+- Comprehensive dashboard with analytics (users, listings, escrow volume)
+- User management with role assignment and identity verification
+- Escrow case management (payment verification, delivery tracking, dispute resolution)
+- Category, listing, and featured content management
+- Payment settings configuration
+- Wallet and payout administration
+- Full audit logging
 
-```sh
-# Step 1: Clone the repository using the project's Git URL.
-git clone <YOUR_GIT_URL>
+---
 
-# Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
+## Tech Stack
 
-# Step 3: Install the necessary dependencies.
-npm i
+| Layer          | Technology                                                                 |
+| -------------- | -------------------------------------------------------------------------- |
+| **Frontend**   | React 18, TypeScript, Vite 5, Tailwind CSS 3, shadcn/ui, Radix UI         |
+| **State**      | Zustand, TanStack React Query, Redux Toolkit                              |
+| **Backend**    | Express.js 4, TypeScript (tsx), Socket.IO                                  |
+| **Database**   | PostgreSQL via `node-postgres` (`pg`)                                      |
+| **Auth**       | JSON Web Tokens (jsonwebtoken), bcryptjs                                   |
+| **Real-time**  | Socket.IO with JWT-authenticated rooms                                     |
+| **Charts**     | Recharts, Chart.js                                                         |
+| **3D**         | Three.js, @react-three/fiber                                               |
+| **Payments**   | QR code generation                                                    |
+| **PWA**        | Vite PWA plugin with Workbox                                               |
 
-# Step 4: Start the development server with auto-reloading and an instant preview.
-npm run dev
+---
+
+## Architecture
+
+```
+┌──────────────────────────────────────────────────────┐
+│                  Frontend (Vite :3000)                 │
+│  React + TypeScript + Tailwind + shadcn/ui            │
+│  ┌──────────────────────────────────────────────────┐ │
+│  │   Proxy /api → localhost:3001                    │ │
+│  └──────────────────────────────────────────────────┘ │
+└──────────────────────┬───────────────────────────────┘
+                       │ HTTP / WebSocket
+┌──────────────────────▼───────────────────────────────┐
+│                 Express API (:3001)                    │
+│  ┌──────────┐  ┌──────────┐  ┌────────────────────┐  │
+│  │   Auth   │  │  Routes  │  │  Socket.IO Server  │  │
+│  └──────────┘  └────┬─────┘  └────────────────────┘  │
+│                     │                                  │
+│              ┌──────▼──────┐                          │
+│              │  PostgreSQL  │                          │
+│              └─────────────┘                          │
+└──────────────────────────────────────────────────────┘
 ```
 
-**Edit a file directly in GitHub**
+In production, the Express server serves the compiled frontend from `dist/`, allowing single-port deployment.
 
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
+---
 
-**Use GitHub Codespaces**
+## Getting Started
 
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
+### Prerequisites
+- **Node.js** ≥ 20
+- **PostgreSQL** database
 
-## What technologies are used for this project?
+### 1. Clone & Install
 
-This project is built with:
+```bash
+git clone <your-repo-url>
+cd safeescrow
 
-- Vite
-- TypeScript
-- React
-- shadcn-ui
-- Tailwind CSS
+# Install frontend dependencies
+npm install
 
-## How can I deploy this project?
+# Install server dependencies
+cd server && npm install && cd ..
+```
 
-Simply open [OnSpace]() and click on Share -> Publish.
+### 2. Environment Variables
+
+Create a `.env` file in the project root:
+
+```env
+DATABASE_URL=postgresql://user:password@host:5432/safeescrow
+JWT_SECRET=your-secure-random-jwt-secret
+```
+
+### 3. Database Setup
+
+The server automatically runs migrations on startup — tables are created if they don't exist. To run migrations manually:
+
+```bash
+cd server && npm run migrate
+```
+
+To populate with test data:
+
+```bash
+cd server && npm run seed
+```
+
+Test accounts after seeding:
+| Role   | Email                    | Password    |
+| ------ | ------------------------ | ----------- |
+| Admin  | admin@safeescrow.com     | password123 |
+| Buyer  | buyer@example.com        | password123 |
+| Seller | seller@example.com       | password123 |
+
+### 4. Start Development
+
+```bash
+# Terminal 1: Frontend dev server
+npm run dev
+
+# Terminal 2: Backend API server
+cd server && npm run dev
+```
+
+The frontend runs on **http://localhost:3000** and proxies `/api` requests to the backend on port 3001.
+
+---
+
+## Available Scripts
+
+### Root (Frontend)
+
+| Script        | Description                     |
+| ------------- | ------------------------------- |
+| `npm run dev` | Start Vite dev server           |
+| `npm run build` | Production build to `dist/`   |
+| `npm run lint` | Run ESLint                      |
+| `npm run preview` | Preview production build     |
+
+### Server (Backend)
+
+| Script                 | Description                       |
+| ---------------------- | --------------------------------- |
+| `npm run dev`          | Dev server with hot reload        |
+| `npm run start`        | Production start                  |
+| `npm run migrate`      | Run database migrations           |
+| `npm run seed`         | Seed database with test data      |
+
+---
+
+## API Overview
+
+### Public Endpoints
+- `GET /api/categories` — All categories
+- `GET /api/listings` — Paginated listings with filters
+- `GET /api/listings/:id` — Single listing details
+- `GET /api/featured-listings` — Featured listings
+- `GET /api/currency/rates` — Live exchange rates
+- `GET /api/currency/convert` — Currency conversion
+- `POST /api/auth/login` — User login
+- `POST /api/auth/register` — User registration
+
+### Authenticated Endpoints
+- `GET/PUT /api/auth/me` — Current user profile
+- `GET/POST /api/escrow` — User's escrow cases
+- `GET/PUT/DELETE /api/escrow/:id` — Single escrow case
+- `GET/POST /api/messages` — Messaging
+- `GET/POST /api/conversations` — Conversations
+- `GET/POST /api/favorites` — Saved listings
+- `POST /api/listings` — Create a listing (seller)
+- `GET /api/wallet` — User's wallet
+- `GET /api/notifications` — User notifications
+
+### Admin Endpoints (requires admin role)
+- `GET/POST/PUT/DELETE /api/admin/users` — User management
+- `GET/PUT/DELETE /api/admin/listings` — Listing management
+- `GET/PUT/DELETE /api/admin/escrow` — Escrow administration
+- `GET/PUT /api/admin/wallets` — Wallet administration
+- `GET/POST /api/admin/payment-settings` — Payment configuration
+- `GET /api/admin/analytics` — Platform analytics
+- `GET /api/admin/audit-logs` — Audit trail
+
+---
+
+## Project Structure
+
+```
+safeescrow/
+├── src/                          # Frontend React app
+│   ├── components/
+│   │   ├── ui/                   # shadcn/ui primitives
+│   │   ├── features/             # ListingCard, EscrowTimeline, etc.
+│   │   └── layout/               # Navbar, AdminSidebar
+│   ├── pages/                    # All route pages
+│   │   ├── admin/                # 17 admin panel pages
+│   │   └── ...                   # Public & user pages
+│   ├── hooks/                    # useAuth, useSocket, etc.
+│   ├── lib/                      # API client, utils, stores
+│   ├── constants/                # Status configs, enums
+│   └── types/                    # TypeScript interfaces
+├── server/                       # Express backend
+│   └── src/
+│       ├── routes/               # API route handlers
+│       │   └── admin/            # Admin-specific routes
+│       ├── middleware/           # Auth & admin middleware
+│       ├── db.ts                 # PostgreSQL connection
+│       ├── index.ts              # Server entry + migrations
+│       ├── socket.ts             # Socket.IO setup
+│       └── seed.ts               # Test data seeder
+├── public/                       # Static assets
+├── dist/                         # Production build output
+├── railway.json                  # Railway deployment config
+└── vite.config.ts                # Vite configuration
+```
+
+---
+
+## Database Schema (Key Tables)
+
+| Table               | Purpose                                          |
+| ------------------- | ------------------------------------------------ |
+| `user_profiles`     | Users, roles, verification status                |
+| `listings`          | Marketplace listings with images and metadata    |
+| `escrow_cases`      | Core escrow transactions (full lifecycle)        |
+| `escrow_timeline`   | Chronological event log for each escrow case     |
+| `notifications`     | User notifications with read tracking            |
+| `conversations`     | Buyer-seller conversation threads                |
+| `messages`          | Chat messages with file attachments              |
+| `wallets`           | User balances and pending funds                  |
+| `wallet_transactions` | Financial transaction history                  |
+| `payment_settings`  | Admin-managed payment method configurations      |
+| `categories`        | Product category tree with sort order            |
+| `featured_listings` | Curated listings with admin sort order           |
+| `seller_requests`   | Seller verification request workflow             |
+| `payouts`           | Admin-initiated payout records                   |
+| `dispute_evidence`  | Files attached to dispute cases                  |
+| `audit_logs`        | Administrative action audit trail                |
+| `uploaded_files`    | Base64-encoded file storage                      |
+
+---
+
+## Deployment
+
+The project is configured for deployment on **Railway** (see `railway.json`). The build process compiles the frontend, and the Express server serves both the API and static files from a single port.
+
+Alternatively, you can deploy to any Node.js-compatible platform:
+
+```bash
+# 1. Build frontend
+npm run build
+
+# 2. Start server (serves API + frontend)
+cd server && npm run start
+```
+
+Ensure the `DATABASE_URL` and `JWT_SECRET` environment variables are set in your production environment.
+
+---
+
+## License
+
+This project is proprietary software. All rights reserved.
