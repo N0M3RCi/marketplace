@@ -130,12 +130,13 @@ router.delete('/users/:id', async (req: AuthRequest, res) => {
     await pool.query('DELETE FROM notifications WHERE user_id = $1::uuid', [id]);
     await pool.query('DELETE FROM seller_requests WHERE user_id = $1::uuid', [id]);
     await pool.query('DELETE FROM favorites WHERE user_id = $1::uuid', [id]);
-    await pool.query('DELETE FROM audit_logs WHERE entity_id = $1::uuid OR admin_id = $1::uuid', [id]);
+    await pool.query('DELETE FROM audit_logs WHERE entity_id = $1', [id]);
+    await pool.query('DELETE FROM audit_logs WHERE admin_id = $1::uuid', [id]);
 
     // Handle conversations — delete messages then conversations where user is participant
     const convs = await pool.query('SELECT id FROM conversations WHERE buyer_id = $1::uuid OR seller_id = $1::uuid', [id]);
     for (const c of convs.rows) {
-      await pool.query('DELETE FROM messages WHERE conversation_id = $1', [c.id]);
+      await pool.query('DELETE FROM messages WHERE conversation_id = $1::uuid', [c.id]);
     }
     await pool.query('DELETE FROM conversations WHERE buyer_id = $1::uuid OR seller_id = $1::uuid', [id]);
 
