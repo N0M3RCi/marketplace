@@ -140,6 +140,9 @@ router.delete('/users/:id', async (req: AuthRequest, res) => {
     }
     await pool.query('DELETE FROM conversations WHERE buyer_id = $1::uuid OR seller_id = $1::uuid', [id]);
 
+    // Delete featured listings added by this user
+    await pool.query('DELETE FROM featured_listings WHERE added_by = $1::uuid', [id]);
+
     // Delete the user
     await pool.query('DELETE FROM user_profiles WHERE id = $1::uuid', [id]);
 
