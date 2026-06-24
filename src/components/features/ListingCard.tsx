@@ -1,4 +1,4 @@
-import { Heart, MapPin, Star, Eye, ShieldCheck } from 'lucide-react';
+import { Heart, MapPin, Eye, ShieldCheck } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { Badge } from '@/components/ui/badge';
 import { cn, formatCurrency } from '@/lib/utils';
@@ -94,18 +94,7 @@ export default function ListingCard({ listing, onFavorite }: ListingCardProps) {
           </div>
 
           <div className="flex items-center gap-1.5 mt-3 pt-3 border-t border-border/50">
-            <div className="w-5 h-5 rounded-full bg-muted overflow-hidden flex-shrink-0">
-              <img
-                src={`https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=40&h=40&fit=crop&crop=faces&random=${listing.sellerId}`}
-                alt={listing.sellerName}
-                className="w-full h-full object-cover"
-              />
-            </div>
             <span className="text-xs text-muted-foreground truncate">{listing.sellerName}</span>
-            <div className="flex items-center gap-0.5 ml-auto">
-              <Star className="w-3 h-3 fill-amber-400 text-amber-400" />
-              <span className="text-xs font-medium">{listing.sellerRating}</span>
-            </div>
           </div>
         </div>
       </div>

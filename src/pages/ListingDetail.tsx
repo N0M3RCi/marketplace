@@ -2,14 +2,14 @@ import { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import {
   ChevronLeft, ChevronRight, Heart, Share2, ShieldCheck, MapPin,
-  Star, Eye, Package, MessageSquare, BadgeCheck, Clock, Tag, AlertCircle,
+  Eye, Package, MessageSquare, BadgeCheck, Clock, Tag, AlertCircle,
   Loader2, Info
 } from 'lucide-react';
 import Navbar from '@/components/layout/Navbar';
 import { Button } from '@/components/ui/button';
 import { fetchListingById, toggleFavorite, getOrCreateConversation } from '@/lib/api';
 import { useAuth } from '@/hooks/useAuth';
-import { formatCurrency, formatDate, getInitials, cn } from '@/lib/utils';
+import { formatCurrency, formatDate, cn } from '@/lib/utils';
 import { useCurrencyStore } from '@/lib/currencyStore';
 import { MOCK_LISTINGS } from '@/lib/mockData';
 import type { Listing } from '@/types';
@@ -493,27 +493,12 @@ export default function ListingDetail() {
             <div className="bg-white rounded-2xl border border-border p-5">
               <h3 className="font-heading font-semibold text-sm text-foreground mb-4">Seller</h3>
               <div className="flex items-center gap-3 mb-4">
-                <div className="w-12 h-12 rounded-full bg-[hsl(var(--brand-navy))] flex items-center justify-center text-white font-bold text-sm flex-shrink-0 overflow-hidden">
-                  {sellerProfile?.avatar_url ? (
-                    <img src={sellerProfile.avatar_url} alt="" className="w-full h-full object-cover" />
-                  ) : (
-                    getInitials(listing.sellerName)
-                  )}
-                </div>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-1.5">
                     <p className="font-semibold text-sm text-foreground">{listing.sellerName}</p>
                     {sellerProfile?.is_verified && (
                       <BadgeCheck className="w-4 h-4 text-blue-500 flex-shrink-0" />
                     )}
-                  </div>
-                  <div className="flex items-center gap-1 mt-0.5">
-                    <Star className="w-3.5 h-3.5 text-amber-400 fill-amber-400" />
-                    <span className="text-xs font-medium text-foreground">{listing.sellerRating.toFixed(1)}</span>
-                    <span className="text-xs text-muted-foreground">·</span>
-                    <span className="text-xs text-muted-foreground">
-                      {sellerProfile?.total_transactions || 0} transactions
-                    </span>
                   </div>
                 </div>
               </div>
