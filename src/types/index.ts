@@ -21,6 +21,8 @@ export interface Category {
   icon: string;
   listingCount: number;
   color: string;
+  parentId?: string | null;
+  homepageFeatured?: boolean;
 }
 
 export interface Listing {

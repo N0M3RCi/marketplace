@@ -429,6 +429,15 @@ router.put('/categories/:id', async (req: AuthRequest, res) => {
   } catch (err: any) { res.status(500).json({ error: err.message }); }
 });
 
+router.put('/categories/:id/homepage-featured', async (req: AuthRequest, res) => {
+  try {
+    const { featured } = req.body;
+    if (featured === undefined) { res.status(400).json({ error: 'featured field is required' }); return; }
+    await pool.query('UPDATE categories SET homepage_featured = $1 WHERE id = $2', [featured, req.params.id]);
+    res.json({ ok: true });
+  } catch (err: any) { res.status(500).json({ error: err.message }); }
+});
+
 router.delete('/categories/:id', async (req: AuthRequest, res) => {
   try {
     // Check if any listings reference this category

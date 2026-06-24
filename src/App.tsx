@@ -31,6 +31,7 @@ import AdminListings from "./pages/admin/Listings";
 import AdminMessages from "./pages/admin/AdminMessages";
 import AdminWallets from "./pages/admin/Wallets";
 import AdminCategories from "./pages/admin/Categories";
+import AdminHomepageCategories from "./pages/admin/HomepageCategories";
 import AdminFeaturedListings from "./pages/admin/FeaturedListings";
 import Profile from "./pages/Profile";
 
@@ -65,6 +66,7 @@ const App = () => (
               <Route path="users" element={<AdminUsers />} />
               <Route path="listings" element={<AdminListings />} />
               <Route path="categories" element={<AdminCategories />} />
+              <Route path="homepage-categories" element={<AdminHomepageCategories />} />
               <Route path="featured-listings" element={<AdminFeaturedListings />} />
               <Route path="messages" element={<AdminMessages />} />
               <Route path="escrow" element={<EscrowCases />} />

@@ -143,6 +143,43 @@ async function runMigrations() {
     { name: 'categories_parent_id', sql: `ALTER TABLE categories ADD COLUMN IF NOT EXISTS parent_id UUID REFERENCES categories(id)` },
     { name: 'featured_listings', sql: `CREATE TABLE IF NOT EXISTS featured_listings (id UUID PRIMARY KEY DEFAULT gen_random_uuid(), listing_id UUID NOT NULL REFERENCES listings(id) ON DELETE CASCADE, sort_order INTEGER DEFAULT 0, added_by UUID REFERENCES user_profiles(id), created_at TIMESTAMPTZ DEFAULT NOW())` },
     { name: 'featured_listings_unique', sql: `CREATE UNIQUE INDEX IF NOT EXISTS idx_featured_listing_id ON featured_listings(listing_id)` },
+    { name: 'sync_category_listing_count_fn', sql: `
+      CREATE OR REPLACE FUNCTION sync_category_listing_count()
+      RETURNS TRIGGER AS $$
+      BEGIN
+        IF TG_OP = 'INSERT' THEN
+          UPDATE categories SET listing_count = (
+            SELECT COUNT(*) FROM listings WHERE category_id = NEW.category_id AND status = 'active'
+          ) WHERE id = NEW.category_id;
+          RETURN NEW;
+        ELSIF TG_OP = 'DELETE' THEN
+          UPDATE categories SET listing_count = (
+            SELECT COUNT(*) FROM listings WHERE category_id = OLD.category_id AND status = 'active'
+          ) WHERE id = OLD.category_id;
+          RETURN OLD;
+        ELSIF TG_OP = 'UPDATE' THEN
+          IF OLD.category_id IS DISTINCT FROM NEW.category_id OR OLD.status IS DISTINCT FROM NEW.status THEN
+            UPDATE categories SET listing_count = (
+              SELECT COUNT(*) FROM listings WHERE category_id = OLD.category_id AND status = 'active'
+            ) WHERE id = OLD.category_id;
+            UPDATE categories SET listing_count = (
+              SELECT COUNT(*) FROM listings WHERE category_id = NEW.category_id AND status = 'active'
+            ) WHERE id = NEW.category_id;
+          END IF;
+          RETURN NEW;
+        END IF;
+      END;
+      $$ LANGUAGE plpgsql` },
+    { name: 'sync_category_listing_count_trg', sql: `
+      DROP TRIGGER IF EXISTS trg_sync_category_listing_count ON listings;
+      CREATE TRIGGER trg_sync_category_listing_count
+      AFTER INSERT OR DELETE OR UPDATE OF status, category_id ON listings
+      FOR EACH ROW EXECUTE FUNCTION sync_category_listing_count()` },
+    { name: 'sync_category_counts_initial', sql: `
+      UPDATE categories SET listing_count = (
+        SELECT COUNT(*) FROM listings WHERE listings.category_id = categories.id AND listings.status = 'active'
+      )` },
+    { name: 'categories_homepage_featured', sql: `ALTER TABLE categories ADD COLUMN IF NOT EXISTS homepage_featured BOOLEAN DEFAULT false` },
   ];
 
   let allOk = true;

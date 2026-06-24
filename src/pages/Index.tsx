@@ -11,7 +11,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import Navbar from '@/components/layout/Navbar';
 import ListingCard from '@/components/features/ListingCard';
 import { LiquidGlassBackground, GlassCard, GlassPill, GlassButton } from '@/components/features/LiquidGlass';
-import type { Listing } from '@/types';
+import type { Listing, Category } from '@/types';
 
 const STATS = [
 { label: 'Transactions Completed', target: 1893, decimals: 0, prefix: '', suffix: '', display: '1,893', icon: ShieldCheck },
@@ -323,6 +323,7 @@ export default function Index() {
   const [statsVisible, setStatsVisible] = useState(false);
   const [featuredListings, setFeaturedListings] = useState<Listing[]>([]);
   const [featuredLoading, setFeaturedLoading] = useState(true);
+  const [categories, setCategories] = useState<Category[]>([]);
   const statsRef = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
 
@@ -345,6 +346,13 @@ export default function Index() {
       })
       .catch(() => {})
       .finally(() => setFeaturedLoading(false));
+  }, []);
+
+  useEffect(() => {
+    fetch('/api/categories?homepage=true')
+      .then(res => res.json())
+      .then(data => setCategories(data || []))
+      .catch(() => {});
   }, []);
 
   const toggleFavorite = (id: string) => {
@@ -654,7 +662,6 @@ export default function Index() {
       
 
       {/* ─── Categories ─── */}
-      {/* ─── Categories ─── */}
       <section className="py-20 overflow-hidden" style={{ background: 'linear-gradient(180deg, #FFFDF5 0%, rgba(255,248,220,0.50) 50%, #FFFDF5 100%)' }}>
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
 
@@ -680,120 +687,191 @@ export default function Index() {
             </Link>
           </div>
 
-          {/* Asymmetric premium grid */}
-          <div className="grid grid-cols-1 lg:grid-cols-[1fr_1fr_1fr] grid-rows-[auto] gap-5">
+          {/* Dynamic Category Cards */}
+          {(() => {
+            const topCategories = categories
+              .filter(c => !c.parentId && c.listingCount > 0)
+              .sort((a, b) => b.listingCount - a.listingCount)
+              .slice(0, 4);
 
-            {/* Featured hero card — Luxury Watches (spans 2 rows on lg) */}
-            <Link
-              to="/marketplace?category=watches"
-              className="group relative overflow-hidden rounded-3xl lg:row-span-2 flex flex-col justify-end min-h-[320px] lg:min-h-[480px] transition-all duration-500"
-              style={{ background: 'linear-gradient(145deg, #1A0E00 0%, #2E1A00 40%, #3D2500 70%, #1A0E00 100%)', border: '1px solid rgba(240,184,0,0.28)', boxShadow: '0 8px 48px rgba(180,130,0,0.18), inset 0 1px 0 rgba(255,255,255,0.06)' }}
-              onMouseEnter={(e) => {(e.currentTarget as HTMLElement).style.transform = 'translateY(-4px)';(e.currentTarget as HTMLElement).style.boxShadow = '0 20px 64px rgba(180,130,0,0.28), inset 0 1px 0 rgba(255,255,255,0.08)';}}
-              onMouseLeave={(e) => {(e.currentTarget as HTMLElement).style.transform = 'translateY(0)';(e.currentTarget as HTMLElement).style.boxShadow = '0 8px 48px rgba(180,130,0,0.18), inset 0 1px 0 rgba(255,255,255,0.06)';}}>
-              {/* Background image */}
-              <img
-                src="https://images.unsplash.com/photo-1547996160-81dfa63595aa?w=600&h=600&fit=crop&auto=format&q=80"
-                alt="Luxury Watches"
-                className="absolute inset-0 w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
-                style={{ opacity: 0.35, mixBlendMode: 'luminosity' }} />
-              
-              {/* Gradient overlay */}
-              <div className="absolute inset-0" style={{ background: 'linear-gradient(to top, rgba(26,14,0,0.97) 0%, rgba(26,14,0,0.70) 40%, rgba(26,14,0,0.20) 100%)' }} />
-              {/* Gold shimmer highlight */}
-              <div className="absolute top-0 left-0 right-0 h-px" style={{ background: 'linear-gradient(90deg, transparent 0%, rgba(240,184,0,0.60) 50%, transparent 100%)' }} />
-              {/* Content */}
-              <div className="relative z-10 p-7">
-                <div className="flex items-start justify-between mb-5">
-                  <div className="w-14 h-14 rounded-2xl flex items-center justify-center text-3xl"
-                  style={{ background: 'rgba(240,184,0,0.15)', border: '1px solid rgba(240,184,0,0.35)', backdropFilter: 'blur(12px)' }}>⌚</div>
-                  <span className="text-[10px] font-bold px-2.5 py-1 rounded-full"
-                  style={{ background: 'rgba(240,184,0,0.20)', border: '1px solid rgba(240,184,0,0.40)', color: '#F0C040' }}>FEATURED</span>
+            if (topCategories.length === 0) {
+              return (
+                <div className="text-center py-12">
+                  <p className="text-sm" style={{ color: '#9A7C40' }}>No categories with active listings yet</p>
                 </div>
-                <p className="text-[11px] font-semibold uppercase tracking-[0.12em] mb-2" style={{ color: 'rgba(240,184,0,0.70)' }}>Luxury Watches</p>
-                <h3 className="font-heading text-2xl font-bold mb-2 leading-tight" style={{ color: '#FFFDF5' }}>Rolex · Patek<br />Audemars Piguet</h3>
-                <p className="text-xs leading-relaxed mb-5" style={{ color: 'rgba(255,253,245,0.55)' }}>Pre-owned luxury timepieces with full documentation, admin-authenticated before listing.</p>
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-semibold" style={{ color: 'rgba(240,184,0,0.80)' }}>180+ listings</span>
-                  <div className="flex items-center gap-1.5 text-xs font-semibold transition-all duration-200 group-hover:gap-2.5" style={{ color: '#F0C040' }}>
-                    Browse <ArrowRight className="w-3.5 h-3.5" />
-                  </div>
-                </div>
+              );
+            }
+
+            const iconToEmoji: Record<string, string> = {
+              Laptop: '💻', Watch: '⌚', Car: '🚗', Gem: '💎', Palette: '🎨',
+              Trophy: '🏆', Music: '🎵', Building2: '🏢', Tag: '🏷️', Shirt: '👕',
+              Shoe: '👟', Book: '📚', BookOpen: '📖', Phone: '📱', Camera: '📷',
+              Headphones: '🎧', Gamepad: '🎮', Sparkles: '✨', Heart: '❤️',
+              Star: '⭐', Zap: '⚡', Sun: '☀️', Moon: '🌙', Globe: '🌍',
+              Home: '🏠', Wrench: '🔧'
+            };
+
+            const styleThemes = [
+              {
+                // Hero card (index 0) - dark amber/gold
+                container: 'lg:row-span-2 min-h-[320px] lg:min-h-[480px]',
+                bg: 'linear-gradient(145deg, #1A0E00 0%, #2E1A00 40%, #3D2500 70%, #1A0E00 100%)',
+                border: 'rgba(240,184,0,0.28)',
+                shadow: '0 8px 48px rgba(180,130,0,0.18)',
+                textColor: '#FFFDF5',
+                accentColor: '#F0C040',
+                metaColor: 'rgba(255,253,245,0.55)',
+                badgeBg: 'rgba(240,184,0,0.20)',
+                badgeBorder: 'rgba(240,184,0,0.40)',
+                badgeText: '#F0C040',
+                iconBg: 'rgba(240,184,0,0.15)',
+                iconBorder: 'rgba(240,184,0,0.35)',
+                topLine: 'linear-gradient(90deg, transparent 0%, rgba(240,184,0,0.60) 50%, transparent 100%)',
+                tagColor: 'rgba(240,184,0,0.70)',
+              },
+              {
+                // Wide card (index 1) - blue
+                container: 'lg:col-span-2 min-h-[180px] lg:min-h-[220px]',
+                bg: 'linear-gradient(135deg, #F8FCFF 0%, #EAF3FF 50%, #D8EDFF 100%)',
+                border: 'rgba(39,117,202,0.22)',
+                shadow: '0 4px 32px rgba(39,117,202,0.10)',
+                textColor: '#0D1E3A',
+                accentColor: '#2775CA',
+                metaColor: 'rgba(39,117,202,0.70)',
+                badgeBg: 'rgba(39,117,202,0.12)',
+                badgeBorder: 'rgba(39,117,202,0.25)',
+                badgeText: '#2775CA',
+                iconBg: 'rgba(39,117,202,0.12)',
+                iconBorder: 'rgba(39,117,202,0.25)',
+                topLine: 'linear-gradient(90deg, transparent, rgba(39,117,202,0.45), transparent)',
+                tagColor: 'rgba(39,117,202,0.65)',
+              },
+              {
+                // Regular card (index 2) - warm orange
+                container: 'min-h-[180px] lg:min-h-[240px]',
+                bg: 'linear-gradient(135deg, #FFF9F2 0%, #FFF0E0 50%, #FFE8CC 100%)',
+                border: 'rgba(200,100,30,0.18)',
+                shadow: '0 4px 28px rgba(200,100,30,0.08)',
+                textColor: '#2A1200',
+                accentColor: '#C06820',
+                metaColor: 'rgba(140,70,20,0.70)',
+                badgeBg: 'rgba(220,120,40,0.12)',
+                badgeBorder: 'rgba(220,120,40,0.28)',
+                badgeText: '#C06820',
+                iconBg: 'rgba(220,120,40,0.12)',
+                iconBorder: 'rgba(220,120,40,0.28)',
+                topLine: 'linear-gradient(90deg, transparent, rgba(220,120,40,0.45), transparent)',
+                tagColor: 'rgba(180,80,20,0.65)',
+              },
+              {
+                // Regular card (index 3) - green
+                container: 'min-h-[180px] lg:min-h-[240px]',
+                bg: 'linear-gradient(135deg, #F2F8F0 0%, #E4F2E0 50%, #D6ECD2 100%)',
+                border: 'rgba(34,130,40,0.18)',
+                shadow: '0 4px 28px rgba(34,130,40,0.08)',
+                textColor: '#0A2010',
+                accentColor: '#1A8024',
+                metaColor: 'rgba(20,100,28,0.70)',
+                badgeBg: 'rgba(34,130,40,0.10)',
+                badgeBorder: 'rgba(34,130,40,0.22)',
+                badgeText: '#1A8024',
+                iconBg: 'rgba(34,130,40,0.10)',
+                iconBorder: 'rgba(34,130,40,0.22)',
+                topLine: 'linear-gradient(90deg, transparent, rgba(34,130,40,0.40), transparent)',
+                tagColor: 'rgba(20,100,28,0.65)',
+              },
+            ];
+
+            return (
+              <div className="grid grid-cols-1 lg:grid-cols-[1fr_1fr_1fr] grid-rows-[auto] gap-5">
+                {topCategories.map((cat, idx) => {
+                  const theme = styleThemes[idx];
+                  const emoji = iconToEmoji[cat.icon] || '🏷️';
+                  return (
+                    <Link
+                      key={cat.id}
+                      to={`/marketplace?category=${cat.slug}`}
+                      className={`group relative overflow-hidden rounded-3xl flex flex-col justify-end transition-all duration-500 ${theme.container}`}
+                      style={{
+                        background: theme.bg,
+                        border: `1px solid ${theme.border}`,
+                        boxShadow: `${theme.shadow}, inset 0 1px 0 rgba(255,255,255,${idx === 0 ? '0.06' : '0.95'})`,
+                      }}
+                      onMouseEnter={(e) => {
+                        (e.currentTarget as HTMLElement).style.transform = 'translateY(-4px)';
+                        (e.currentTarget as HTMLElement).style.boxShadow = idx === 0
+                          ? '0 20px 64px rgba(180,130,0,0.28), inset 0 1px 0 rgba(255,255,255,0.08)'
+                          : `0 16px 48px rgba(0,0,0,0.12), inset 0 1px 0 rgba(255,255,255,0.95)`;
+                      }}
+                      onMouseLeave={(e) => {
+                        (e.currentTarget as HTMLElement).style.transform = 'translateY(0)';
+                        (e.currentTarget as HTMLElement).style.boxShadow = `${theme.shadow}, inset 0 1px 0 rgba(255,255,255,${idx === 0 ? '0.06' : '0.95'})`;
+                      }}
+                    >
+                      {/* Top accent line */}
+                      {idx === 0 && (
+                        <div className="absolute top-0 left-0 right-0 h-px" style={{ background: theme.topLine }} />
+                      )}
+                      {idx > 0 && (
+                        <div className="absolute top-0 left-0 right-0 h-px" style={{ background: theme.topLine }} />
+                      )}
+
+                      {/* Decorative radial glow for regular cards */}
+                      {idx > 0 && (
+                        <div className="absolute top-0 right-0 w-32 h-32 pointer-events-none"
+                          style={{ background: `radial-gradient(circle at top right, ${theme.accentColor}22 0%, transparent 70%)` }} />
+                      )}
+
+                      <div className="relative z-10 p-7" style={idx > 0 ? { padding: '1.5rem' } : {}}>
+                        {idx === 0 ? (
+                          <>
+                            <div className="flex items-start justify-between mb-5">
+                              <div className="w-14 h-14 rounded-2xl flex items-center justify-center text-3xl"
+                                style={{ background: theme.iconBg, border: `1px solid ${theme.iconBorder}`, backdropFilter: 'blur(12px)' }}>{emoji}</div>
+                              <span className="text-[10px] font-bold px-2.5 py-1 rounded-full"
+                                style={{ background: theme.badgeBg, border: `1px solid ${theme.badgeBorder}`, color: theme.badgeText }}>FEATURED</span>
+                            </div>
+                            <p className="text-[11px] font-semibold uppercase tracking-[0.12em] mb-2" style={{ color: theme.tagColor }}>{cat.name}</p>
+                            <h3 className="font-heading text-2xl font-bold mb-2 leading-tight" style={{ color: theme.textColor }}>{cat.name}</h3>
+                            <p className="text-xs leading-relaxed mb-5" style={{ color: theme.metaColor }}>Admin-verified listings with escrow protection on every purchase.</p>
+                            <div className="flex items-center justify-between">
+                              <span className="text-xs font-semibold" style={{ color: theme.accentColor }}>{cat.listingCount} listing{cat.listingCount !== 1 ? 's' : ''}</span>
+                              <div className="flex items-center gap-1.5 text-xs font-semibold transition-all duration-200 group-hover:gap-2.5" style={{ color: theme.accentColor }}>
+                                Browse <ArrowRight className="w-3.5 h-3.5" />
+                              </div>
+                            </div>
+                          </>
+                        ) : (
+                          <div className="flex items-end justify-between" style={idx === 1 ? {} : {}}>
+                            <div>
+                              <div className="w-12 h-12 rounded-2xl flex items-center justify-center text-2xl mb-4"
+                                style={{ background: theme.iconBg, border: `1px solid ${theme.iconBorder}` }}>{emoji}</div>
+                              <p className="text-[10px] font-bold uppercase tracking-[0.12em] mb-1" style={{ color: theme.tagColor }}>{cat.name}</p>
+                              <h3 className="font-heading text-xl font-bold" style={{ color: theme.textColor }}>
+                                {idx === 1 ? cat.name : cat.name}
+                              </h3>
+                              <p className="text-xs mt-1" style={{ color: theme.metaColor }}>{cat.listingCount} listing{cat.listingCount !== 1 ? 's' : ''}</p>
+                            </div>
+                            {idx === 1 ? (
+                              <div className="text-right flex-shrink-0 ml-6">
+                                <p className="text-2xl font-black font-heading" style={{ color: theme.accentColor }}>{cat.listingCount}+</p>
+                                <p className="text-[11px]" style={{ color: theme.metaColor }}>active listing{cat.listingCount !== 1 ? 's' : ''}</p>
+                                <div className="mt-3 flex items-center gap-1 text-xs font-semibold justify-end transition-all duration-200 group-hover:gap-2" style={{ color: theme.accentColor }}>
+                                  Explore <ArrowRight className="w-3.5 h-3.5" />
+                                </div>
+                              </div>
+                            ) : (
+                              <ArrowRight className="w-5 h-5 mb-1 transition-transform duration-200 group-hover:translate-x-1" style={{ color: theme.accentColor }} />
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    </Link>
+                  );
+                })}
               </div>
-            </Link>
-
-            {/* Electronics — wide card top right */}
-            <Link
-              to="/marketplace?category=electronics"
-              className="group relative overflow-hidden rounded-3xl col-span-1 lg:col-span-2 flex flex-col justify-end min-h-[180px] lg:min-h-[220px] transition-all duration-500"
-              style={{ background: 'linear-gradient(135deg, #F8FCFF 0%, #EAF3FF 50%, #D8EDFF 100%)', border: '1px solid rgba(39,117,202,0.22)', boxShadow: '0 4px 32px rgba(39,117,202,0.10), inset 0 1px 0 rgba(255,255,255,0.95)' }}
-              onMouseEnter={(e) => {(e.currentTarget as HTMLElement).style.transform = 'translateY(-3px)';(e.currentTarget as HTMLElement).style.boxShadow = '0 16px 48px rgba(39,117,202,0.18), inset 0 1px 0 rgba(255,255,255,0.95)';}}
-              onMouseLeave={(e) => {(e.currentTarget as HTMLElement).style.transform = 'translateY(0)';(e.currentTarget as HTMLElement).style.boxShadow = '0 4px 32px rgba(39,117,202,0.10), inset 0 1px 0 rgba(255,255,255,0.95)';}}>
-              <div className="absolute top-0 left-0 right-0 h-px" style={{ background: 'linear-gradient(90deg, transparent, rgba(39,117,202,0.45), transparent)' }} />
-              <div className="relative z-10 p-6 flex items-end justify-between">
-                <div>
-                  <div className="w-12 h-12 rounded-2xl flex items-center justify-center text-2xl mb-4"
-                  style={{ background: 'rgba(39,117,202,0.12)', border: '1px solid rgba(39,117,202,0.25)' }}>💻</div>
-                  <p className="text-[10px] font-bold uppercase tracking-[0.12em] mb-1" style={{ color: 'rgba(39,117,202,0.65)' }}>Electronics</p>
-                  <h3 className="font-heading text-xl font-bold leading-tight" style={{ color: '#0D1E3A' }}>MacBooks, iPhones<br />&amp; Pro Gear</h3>
-                </div>
-                <div className="text-right flex-shrink-0 ml-6">
-                  <p className="text-2xl font-black font-heading" style={{ color: '#2775CA' }}>320+</p>
-                  <p className="text-[11px]" style={{ color: 'rgba(39,117,202,0.70)' }}>active listings</p>
-                  <div className="mt-3 flex items-center gap-1 text-xs font-semibold justify-end transition-all duration-200 group-hover:gap-2" style={{ color: '#2775CA' }}>
-                    Explore <ArrowRight className="w-3.5 h-3.5" />
-                  </div>
-                </div>
-              </div>
-            </Link>
-
-            {/* Jewelry card */}
-            <Link
-              to="/marketplace?category=jewelry"
-              className="group relative overflow-hidden rounded-3xl transition-all duration-500 flex flex-col justify-end min-h-[180px] lg:min-h-[240px]"
-              style={{ background: 'linear-gradient(135deg, #FFF9F2 0%, #FFF0E0 50%, #FFE8CC 100%)', border: '1px solid rgba(200,100,30,0.18)', boxShadow: '0 4px 28px rgba(200,100,30,0.08), inset 0 1px 0 rgba(255,255,255,0.95)' }}
-              onMouseEnter={(e) => {(e.currentTarget as HTMLElement).style.transform = 'translateY(-3px)';(e.currentTarget as HTMLElement).style.boxShadow = '0 14px 40px rgba(200,100,30,0.16), inset 0 1px 0 rgba(255,255,255,0.95)';}}
-              onMouseLeave={(e) => {(e.currentTarget as HTMLElement).style.transform = 'translateY(0)';(e.currentTarget as HTMLElement).style.boxShadow = '0 4px 28px rgba(200,100,30,0.08), inset 0 1px 0 rgba(255,255,255,0.95)';}}>
-              <div className="absolute top-0 left-0 right-0 h-px" style={{ background: 'linear-gradient(90deg, transparent, rgba(220,120,40,0.45), transparent)' }} />
-              {/* Decorative radial glow */}
-              <div className="absolute top-0 right-0 w-32 h-32 pointer-events-none" style={{ background: 'radial-gradient(circle at top right, rgba(240,160,60,0.22) 0%, transparent 70%)' }} />
-              <div className="relative z-10 p-6">
-                <div className="flex items-end justify-between">
-                  <div>
-                    <div className="w-12 h-12 rounded-2xl flex items-center justify-center text-2xl mb-4"
-                    style={{ background: 'rgba(220,120,40,0.12)', border: '1px solid rgba(220,120,40,0.28)' }}>💎</div>
-                    <p className="text-[10px] font-bold uppercase tracking-[0.12em] mb-1" style={{ color: 'rgba(180,80,20,0.65)' }}>Jewelry</p>
-                    <h3 className="font-heading text-xl font-bold" style={{ color: '#2A1200' }}>Diamonds &amp; Gold</h3>
-                    <p className="text-xs mt-1" style={{ color: 'rgba(140,70,20,0.70)' }}>210+ listings</p>
-                  </div>
-                  <ArrowRight className="w-5 h-5 mb-1 transition-transform duration-200 group-hover:translate-x-1" style={{ color: '#C06820' }} />
-                </div>
-              </div>
-            </Link>
-
-            {/* Vehicles card */}
-            <Link
-              to="/marketplace?category=vehicles"
-              className="group relative overflow-hidden rounded-3xl transition-all duration-500 flex flex-col justify-end min-h-[180px] lg:min-h-[240px]"
-              style={{ background: 'linear-gradient(135deg, #F2F8F0 0%, #E4F2E0 50%, #D6ECD2 100%)', border: '1px solid rgba(34,130,40,0.18)', boxShadow: '0 4px 28px rgba(34,130,40,0.08), inset 0 1px 0 rgba(255,255,255,0.95)' }}
-              onMouseEnter={(e) => {(e.currentTarget as HTMLElement).style.transform = 'translateY(-3px)';(e.currentTarget as HTMLElement).style.boxShadow = '0 14px 40px rgba(34,130,40,0.14), inset 0 1px 0 rgba(255,255,255,0.95)';}}
-              onMouseLeave={(e) => {(e.currentTarget as HTMLElement).style.transform = 'translateY(0)';(e.currentTarget as HTMLElement).style.boxShadow = '0 4px 28px rgba(34,130,40,0.08), inset 0 1px 0 rgba(255,255,255,0.95)';}}>
-              <div className="absolute top-0 left-0 right-0 h-px" style={{ background: 'linear-gradient(90deg, transparent, rgba(34,130,40,0.40), transparent)' }} />
-              <div className="absolute top-0 right-0 w-32 h-32 pointer-events-none" style={{ background: 'radial-gradient(circle at top right, rgba(60,180,60,0.18) 0%, transparent 70%)' }} />
-              <div className="relative z-10 p-6">
-                <div className="flex items-end justify-between">
-                  <div>
-                    <div className="w-12 h-12 rounded-2xl flex items-center justify-center text-2xl mb-4"
-                    style={{ background: 'rgba(34,130,40,0.10)', border: '1px solid rgba(34,130,40,0.22)' }}>🚗</div>
-                    <p className="text-[10px] font-bold uppercase tracking-[0.12em] mb-1" style={{ color: 'rgba(20,100,28,0.65)' }}>Vehicles</p>
-                    <h3 className="font-heading text-xl font-bold" style={{ color: '#0A2010' }}>Cars &amp; Collectibles</h3>
-                    <p className="text-xs mt-1" style={{ color: 'rgba(20,100,28,0.70)' }}>95+ listings</p>
-                  </div>
-                  <ArrowRight className="w-5 h-5 mb-1 transition-transform duration-200 group-hover:translate-x-1" style={{ color: '#1A8024' }} />
-                </div>
-              </div>
-            </Link>
-
-          </div>
+            );
+          })()}
         </div>
       </section>
 

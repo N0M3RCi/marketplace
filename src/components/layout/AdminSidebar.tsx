@@ -2,7 +2,7 @@ import { NavLink, useLocation } from 'react-router-dom';
 import {
   LayoutDashboard, Users, ListChecks, FolderOpen, Wallet, Scale,
   ShieldCheck, Truck, AlertTriangle, Banknote, BarChart3, FileText,
-  ChevronRight, Shield, Bitcoin, MessageSquare, FolderKanban, Star
+  ChevronRight, Shield, Bitcoin, MessageSquare, FolderKanban, Star, LayoutGrid
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -11,6 +11,7 @@ const navItems = [
   { icon: Users,           label: 'Users',              path: '/admin/users' },
   { icon: ListChecks,      label: 'Listings',           path: '/admin/listings' },
   { icon: FolderKanban,    label: 'Categories',         path: '/admin/categories' },
+  { icon: LayoutGrid,      label: 'Homepage Categories', path: '/admin/homepage-categories' },
   { icon: Star,            label: 'Featured Listings',   path: '/admin/featured-listings' },
   { icon: MessageSquare,   label: 'Messages',           path: '/admin/messages' },
   { icon: FolderOpen,      label: 'Escrow Cases',       path: '/admin/escrow' },
