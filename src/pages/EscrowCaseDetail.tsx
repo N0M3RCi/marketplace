@@ -192,6 +192,22 @@ export default function EscrowCaseDetail() {
     }
   };
 
+  const handleCancelPaymentSelection = async () => {
+    try {
+      await escrow.update(id!, {
+        payment_address: null,
+        payment_network: null,
+        payment_admin_notes: null,
+      });
+    } catch {}
+    setPaymentAddress(null);
+    setShowPaymentForm(false);
+    setPaymentForm({ txHash: '', amountSent: '', method: 'crypto' });
+    setPaymentProofFile(null);
+    toast.info('Payment selection cancelled');
+    await fetchCase();
+  };
+
   const handleSelectAddress = async (addr: any) => {
     try {
       await escrow.update(id!, {
@@ -604,7 +620,7 @@ export default function EscrowCaseDetail() {
                         {saving ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <CheckCircle className="w-4 h-4 mr-2" />}
                         Submit Payment Proof
                       </Button>
-                      <Button variant="outline" onClick={() => setShowPaymentForm(false)}>Cancel</Button>
+                      <Button variant="outline" onClick={handleCancelPaymentSelection}>Cancel</Button>
                     </div>
                   </div>
                 )}
