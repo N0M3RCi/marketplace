@@ -32,8 +32,9 @@ export default function Marketplace() {
     fetchCategories().then(cats => { if (cats.length > 0) setCategories(cats); }).catch(() => {});
   }, []);
 
-  // Load listings from backend with debounce
+  // Load listings from backend with debounce (wait for categories first)
   useEffect(() => {
+    if (categories.length === 0) return; // Wait for categories to load first
     setListingsLoading(true);
     const timer = setTimeout(() => {
       let catIds: string[] | undefined;
@@ -45,10 +46,6 @@ export default function Marketplace() {
             cat.id,
             ...categories.filter(c => c.parentId === cat.id).map(c => c.id),
           ];
-        } else {
-          // Category slug not found yet (categories haven't loaded) — skip this fetch
-          setListingsLoading(false);
-          return;
         }
       }
       fetchListings({
