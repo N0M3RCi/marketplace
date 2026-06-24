@@ -30,6 +30,7 @@ import PaymentSettings from "./pages/admin/PaymentSettings";
 import AdminListings from "./pages/admin/Listings";
 import AdminMessages from "./pages/admin/AdminMessages";
 import AdminWallets from "./pages/admin/Wallets";
+import AdminCategories from "./pages/admin/Categories";
 import Profile from "./pages/Profile";
 
 const queryClient = new QueryClient();
@@ -62,6 +63,7 @@ const App = () => (
               <Route index element={<AdminDashboard />} />
               <Route path="users" element={<AdminUsers />} />
               <Route path="listings" element={<AdminListings />} />
+              <Route path="categories" element={<AdminCategories />} />
               <Route path="messages" element={<AdminMessages />} />
               <Route path="escrow" element={<EscrowCases />} />
               <Route path="escrow/:id" element={<AdminEscrowCaseDetail />} />

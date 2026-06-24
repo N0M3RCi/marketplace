@@ -392,6 +392,55 @@ router.get('/analytics', async (_req: AuthRequest, res) => {
   } catch (err: any) { res.status(500).json({ error: err.message }); }
 });
 
+// ============ CATEGORIES (admin CRUD) ============
+router.get('/categories', async (_req: AuthRequest, res) => {
+  try {
+    const result = await pool.query('SELECT * FROM categories ORDER BY name');
+    res.json(result.rows);
+  } catch (err: any) { res.status(500).json({ error: err.message }); }
+});
+
+router.post('/categories', async (req: AuthRequest, res) => {
+  try {
+    const { name, slug, icon, color } = req.body;
+    if (!name || !name.trim()) { res.status(400).json({ error: 'Name is required' }); return; }
+    const finalSlug = slug || name.trim().toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
+    const id = uuid();
+    await pool.query(
+      'INSERT INTO categories (id, name, slug, icon, color) VALUES ($1,$2,$3,$4,$5)',
+      [id, name.trim(), finalSlug, icon || 'Tag', color || 'text-gray-600']);
+    res.status(201).json({ id });
+  } catch (err: any) { res.status(500).json({ error: err.message }); }
+});
+
+router.put('/categories/:id', async (req: AuthRequest, res) => {
+  try {
+    const { name, slug, icon, color } = req.body;
+    const sets: string[] = []; const vals: any[] = []; let idx = 1;
+    if (name !== undefined) { sets.push(`name = $${idx++}`); vals.push(name.trim()); }
+    if (slug !== undefined) { sets.push(`slug = $${idx++}`); vals.push(slug); }
+    if (icon !== undefined) { sets.push(`icon = $${idx++}`); vals.push(icon); }
+    if (color !== undefined) { sets.push(`color = $${idx++}`); vals.push(color); }
+    if (sets.length === 0) { res.json({ ok: true }); return; }
+    vals.push(req.params.id);
+    await pool.query(`UPDATE categories SET ${sets.join(', ')} WHERE id = $${idx}`, vals);
+    res.json({ ok: true });
+  } catch (err: any) { res.status(500).json({ error: err.message }); }
+});
+
+router.delete('/categories/:id', async (req: AuthRequest, res) => {
+  try {
+    // Check if any listings reference this category
+    const check = await pool.query('SELECT COUNT(*) FROM listings WHERE category_id = $1', [req.params.id]);
+    if (parseInt(check.rows[0].count) > 0) {
+      res.status(400).json({ error: 'Cannot delete category — it has associated listings. Reassign them first.' });
+      return;
+    }
+    await pool.query('DELETE FROM categories WHERE id = $1', [req.params.id]);
+    res.json({ ok: true });
+  } catch (err: any) { res.status(500).json({ error: err.message }); }
+});
+
 // ============ AUDIT LOGS ============
 router.get('/audit-logs', async (_req: AuthRequest, res) => {
   try {

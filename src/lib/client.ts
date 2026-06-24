@@ -204,6 +204,15 @@ export const admin = {
     reject: (id: string, notes?: string) =>
       request(`/api/admin/seller-requests/${id}/reject`, { method: 'PUT', body: JSON.stringify({ notes }) }),
   },
+  categories: {
+    list: () => request('/api/admin/categories'),
+    create: (data: any) =>
+      request('/api/admin/categories', { method: 'POST', body: JSON.stringify(data) }),
+    update: (id: string, data: any) =>
+      request(`/api/admin/categories/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+    delete: (id: string) =>
+      request(`/api/admin/categories/${id}`, { method: 'DELETE' }),
+  },
 };
 
 // Currency / exchange rates
