@@ -1,7 +1,7 @@
-import { useState, useEffect } from 'react';
-import { Settings, Save, Plus, Copy, CheckCircle, Bitcoin, Shield, Trash2, Eye, EyeOff } from 'lucide-react';
+import { useState, useEffect, useRef } from 'react';
+import { Settings, Save, Plus, Copy, CheckCircle, Bitcoin, Shield, Trash2, Eye, EyeOff, Upload, Image as ImageIcon, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { admin } from '@/lib/client';
+import { admin, storage } from '@/lib/client';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 
@@ -10,6 +10,7 @@ interface PaymentSetting {
   cryptoAddress: string;
   cryptoNetwork: string;
   qrCodeUrl?: string;
+  iconUrl?: string;
   instructions: string;
   isActive: boolean;
   createdAt: string;
@@ -33,12 +34,14 @@ export default function PaymentSettings() {
   const [showAddForm, setShowAddForm] = useState(false);
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [uploadingIcon, setUploadingIcon] = useState(false);
 
   const [form, setForm] = useState({
     cryptoAddress: '',
     cryptoNetwork: 'USDT-TRC20',
     instructions: 'Send the exact amount to the address above. Include your Case ID in the transaction memo/reference. Payment confirmation may take 10–30 minutes.',
     qrCodeUrl: '',
+    iconUrl: '',
   });
 
   const fetchSettings = async () => {
@@ -49,6 +52,7 @@ export default function PaymentSettings() {
         cryptoAddress: s.cryptoAddress || s.crypto_address,
         cryptoNetwork: s.cryptoNetwork || s.crypto_network,
         qrCodeUrl: s.qrCodeUrl || s.qr_code_url,
+        iconUrl: s.iconUrl || s.icon_url,
         instructions: s.instructions || '',
         isActive: s.isActive !== undefined ? s.isActive : s.is_active,
         createdAt: s.createdAt || s.created_at,
@@ -71,6 +75,19 @@ export default function PaymentSettings() {
     setTimeout(() => setCopiedId(null), 2000);
   };
 
+  const handleUploadIcon = async (file: File, onUrl: (url: string) => void) => {
+    if (!file.type.startsWith('image/')) { toast.error('Please select an image file'); return; }
+    setUploadingIcon(true);
+    try {
+      const result = await storage.upload(file);
+      onUrl(result.url);
+      toast.success('Icon uploaded');
+    } catch {
+      toast.error('Failed to upload icon');
+    }
+    setUploadingIcon(false);
+  };
+
   const handleAdd = async () => {
     if (!form.cryptoAddress.trim()) { toast.error('Crypto address is required'); return; }
     setSaving(true);
@@ -81,10 +98,11 @@ export default function PaymentSettings() {
         crypto_network: form.cryptoNetwork,
         instructions: form.instructions.trim(),
         qr_code_url: form.qrCodeUrl.trim() || null,
+        icon_url: form.iconUrl.trim() || null,
       });
       toast.success('Payment address added successfully');
       setShowAddForm(false);
-      setForm({ cryptoAddress: '', cryptoNetwork: 'USDT-TRC20', instructions: 'Send the exact amount to the address above. Include your Case ID in the transaction memo/reference. Payment confirmation may take 10–30 minutes.', qrCodeUrl: '' });
+      setForm({ cryptoAddress: '', cryptoNetwork: 'USDT-TRC20', instructions: 'Send the exact amount to the address above. Include your Case ID in the transaction memo/reference. Payment confirmation may take 10–30 minutes.', qrCodeUrl: '', iconUrl: '' });
       await fetchSettings();
     } catch {
       toast.error('Failed to add payment address');
@@ -99,6 +117,7 @@ export default function PaymentSettings() {
         crypto_network: updates.cryptoNetwork,
         instructions: updates.instructions,
         is_active: updates.isActive,
+        icon_url: updates.iconUrl || null,
       });
       toast.success('Settings updated');
       await fetchSettings();
@@ -189,6 +208,54 @@ export default function PaymentSettings() {
             </div>
 
             <div>
+              <label className="block text-sm font-medium mb-1.5">Crypto Icon <span className="text-muted-foreground text-xs">(optional — upload or paste URL)</span></label>
+              <div className="flex items-center gap-3">
+                {form.iconUrl ? (
+                  <div className="relative w-12 h-12 rounded-xl border border-border overflow-hidden flex-shrink-0 bg-white">
+                    <img src={form.iconUrl} alt="Icon" className="w-full h-full object-contain" />
+                    <button
+                      onClick={() => setForm(p => ({ ...p, iconUrl: '' }))}
+                      className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-red-500 text-white rounded-full flex items-center justify-center"
+                    >
+                      <X className="w-3 h-3" />
+                    </button>
+                  </div>
+                ) : (
+                  <div className="w-12 h-12 rounded-xl border border-dashed border-border flex items-center justify-center flex-shrink-0 bg-muted/30">
+                    <ImageIcon className="w-5 h-5 text-muted-foreground/40" />
+                  </div>
+                )}
+                <div className="flex-1 flex gap-2">
+                  <input
+                    type="url"
+                    value={form.iconUrl}
+                    onChange={e => setForm(p => ({ ...p, iconUrl: e.target.value }))}
+                    placeholder="https://example.com/bitcoin-logo.png"
+                    className="flex-1 px-4 py-2.5 text-sm border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-[hsl(var(--brand-navy))]"
+                  />
+                  <label className={cn(
+                    'flex items-center gap-2 px-4 py-2.5 text-sm font-medium rounded-xl border cursor-pointer transition-colors',
+                    uploadingIcon ? 'opacity-50 cursor-wait' : 'hover:border-foreground hover:text-foreground'
+                  )}>
+                    <Upload className="w-4 h-4" />
+                    Upload
+                    <input
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
+                      disabled={uploadingIcon}
+                      onChange={e => {
+                        const file = e.target.files?.[0];
+                        if (file) handleUploadIcon(file, (url) => setForm(p => ({ ...p, iconUrl: url })));
+                        e.target.value = '';
+                      }}
+                    />
+                  </label>
+                </div>
+              </div>
+            </div>
+
+            <div>
               <label className="block text-sm font-medium mb-1.5">Payment Instructions</label>
               <textarea
                 value={form.instructions}
@@ -246,9 +313,13 @@ export default function PaymentSettings() {
               )}>
                 <div className="flex items-start justify-between gap-4">
                   <div className="flex items-center gap-3">
-                    <div className={cn('w-10 h-10 rounded-xl flex items-center justify-center text-lg font-bold flex-shrink-0', net.bg, net.color)}>
-                      {net.symbol}
-                    </div>
+                    {s.iconUrl ? (
+                      <img src={s.iconUrl} alt={s.cryptoNetwork} className="w-10 h-10 rounded-xl object-contain border border-border bg-white flex-shrink-0" />
+                    ) : (
+                      <div className={cn('w-10 h-10 rounded-xl flex items-center justify-center text-lg font-bold flex-shrink-0', net.bg, net.color)}>
+                        {net.symbol}
+                      </div>
+                    )}
                     <div>
                       <div className="flex items-center gap-2">
                         <p className="font-semibold text-sm text-foreground">{net.label}</p>
@@ -341,7 +412,22 @@ function EditAddressForm({
     cryptoAddress: setting.cryptoAddress,
     cryptoNetwork: setting.cryptoNetwork,
     instructions: setting.instructions,
+    iconUrl: setting.iconUrl || '',
   });
+  const [uploadingIcon, setUploadingIcon] = useState(false);
+
+  const handleUploadIcon = async (file: File, onUrl: (url: string) => void) => {
+    if (!file.type.startsWith('image/')) { toast.error('Please select an image file'); return; }
+    setUploadingIcon(true);
+    try {
+      const result = await storage.upload(file);
+      onUrl(result.url);
+      toast.success('Icon uploaded');
+    } catch {
+      toast.error('Failed to upload icon');
+    }
+    setUploadingIcon(false);
+  };
 
   return (
     <div className="mt-4 pt-4 border-t border-border space-y-4">
@@ -364,6 +450,52 @@ function EditAddressForm({
             onChange={e => setForm(p => ({ ...p, cryptoAddress: e.target.value }))}
             className="w-full px-3 py-2.5 text-sm font-mono border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-[hsl(var(--brand-navy))]"
           />
+        </div>
+      </div>
+      <div>
+        <label className="block text-xs font-medium mb-1.5">
+          Crypto Icon <span className="text-muted-foreground">(optional)</span>
+        </label>
+        <div className="flex items-center gap-3">
+          {form.iconUrl ? (
+            <div className="relative w-10 h-10 rounded-lg border border-border overflow-hidden flex-shrink-0 bg-white">
+              <img src={form.iconUrl} alt="Icon" className="w-full h-full object-contain" />
+              <button
+                onClick={() => setForm(p => ({ ...p, iconUrl: '' }))}
+                className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-red-500 text-white rounded-full flex items-center justify-center"
+              >
+                <X className="w-3 h-3" />
+              </button>
+            </div>
+          ) : (
+            <div className="w-10 h-10 rounded-lg border border-dashed border-border flex items-center justify-center flex-shrink-0 bg-muted/30">
+              <ImageIcon className="w-4 h-4 text-muted-foreground/40" />
+            </div>
+          )}
+          <input
+            type="url"
+            value={form.iconUrl}
+            onChange={e => setForm(p => ({ ...p, iconUrl: e.target.value }))}
+            placeholder="https://example.com/bitcoin-logo.png"
+            className="flex-1 px-3 py-2 text-sm border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-[hsl(var(--brand-navy))]"
+          />
+          <label className={cn(
+            'flex items-center gap-2 px-3 py-2 text-xs font-medium rounded-lg border cursor-pointer transition-colors flex-shrink-0',
+            uploadingIcon ? 'opacity-50 cursor-wait' : 'hover:border-foreground'
+          )}>
+            <Upload className="w-3.5 h-3.5" /> Upload
+            <input
+              type="file"
+              accept="image/*"
+              className="hidden"
+              disabled={uploadingIcon}
+              onChange={e => {
+                const file = e.target.files?.[0];
+                if (file) handleUploadIcon(file, (url) => setForm(p => ({ ...p, iconUrl: url })));
+                e.target.value = '';
+              }}
+            />
+          </label>
         </div>
       </div>
       <div>

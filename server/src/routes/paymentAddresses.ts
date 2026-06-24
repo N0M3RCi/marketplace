@@ -16,6 +16,7 @@ router.get('/', async (_req, res) => {
       cryptoNetwork: s.crypto_network,
       instructions: s.instructions || '',
       qrCodeUrl: s.qr_code_url || null,
+      iconUrl: s.icon_url || null,
       isActive: s.is_active,
       createdAt: s.created_at,
     })));

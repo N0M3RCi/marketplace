@@ -329,6 +329,7 @@ router.get('/payment-settings', async (_req: AuthRequest, res) => {
       cryptoNetwork: s.crypto_network,
       instructions: s.instructions || '',
       qrCodeUrl: s.qr_code_url || null,
+      iconUrl: s.icon_url || null,
       isActive: s.is_active,
       createdAt: s.created_at,
       updatedAt: s.updated_at,
@@ -337,6 +338,7 @@ router.get('/payment-settings', async (_req: AuthRequest, res) => {
       crypto_network: s.crypto_network,
       is_active: s.is_active,
       qr_code_url: s.qr_code_url,
+      icon_url: s.icon_url || null,
       created_at: s.created_at,
       updated_at: s.updated_at,
     })));
@@ -345,10 +347,10 @@ router.get('/payment-settings', async (_req: AuthRequest, res) => {
 
 router.post('/payment-settings', async (req: AuthRequest, res) => {
   try {
-    const { method, crypto_address, crypto_network, instructions, qr_code_url } = req.body;
+    const { method, crypto_address, crypto_network, instructions, qr_code_url, icon_url } = req.body;
     await pool.query(
-      'INSERT INTO payment_settings (method, crypto_address, crypto_network, instructions, qr_code_url) VALUES ($1,$2,$3,$4,$5)',
-      [method || 'crypto', crypto_address, crypto_network, instructions || null, qr_code_url || null]
+      'INSERT INTO payment_settings (method, crypto_address, crypto_network, instructions, qr_code_url, icon_url) VALUES ($1,$2,$3,$4,$5,$6)',
+      [method || 'crypto', crypto_address, crypto_network, instructions || null, qr_code_url || null, icon_url || null]
     );
     res.status(201).json({ ok: true });
   } catch (err: any) { res.status(500).json({ error: err.message }); }
@@ -356,10 +358,10 @@ router.post('/payment-settings', async (req: AuthRequest, res) => {
 
 router.put('/payment-settings/:id', async (req: AuthRequest, res) => {
   try {
-    const { crypto_address, crypto_network, instructions, qr_code_url, is_active } = req.body;
+    const { crypto_address, crypto_network, instructions, qr_code_url, is_active, icon_url } = req.body;
     await pool.query(
-      `UPDATE payment_settings SET crypto_address=$1, crypto_network=$2, instructions=$3, qr_code_url=$4, is_active=$5, updated_at=NOW() WHERE id=$6`,
-      [crypto_address, crypto_network, instructions || null, qr_code_url || null, is_active !== undefined ? is_active : true, req.params.id]
+      `UPDATE payment_settings SET crypto_address=$1, crypto_network=$2, instructions=$3, qr_code_url=$4, is_active=$5, icon_url=$6, updated_at=NOW() WHERE id=$7`,
+      [crypto_address, crypto_network, instructions || null, qr_code_url || null, is_active !== undefined ? is_active : true, icon_url || null, req.params.id]
     );
     res.json({ ok: true });
   } catch (err: any) { res.status(500).json({ error: err.message }); }

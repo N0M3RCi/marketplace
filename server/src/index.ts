@@ -189,6 +189,7 @@ async function runMigrations() {
     { name: 'categories_image_url', sql: `ALTER TABLE categories ADD COLUMN IF NOT EXISTS image_url TEXT` },
     { name: 'payment_settings_instructions', sql: `ALTER TABLE payment_settings ADD COLUMN IF NOT EXISTS instructions TEXT` },
     { name: 'payment_settings_qr_code_url', sql: `ALTER TABLE payment_settings ADD COLUMN IF NOT EXISTS qr_code_url TEXT` },
+    { name: 'payment_settings_icon_url', sql: `ALTER TABLE payment_settings ADD COLUMN IF NOT EXISTS icon_url TEXT` },
     { name: 'escrow_payment_rejected_at', sql: `ALTER TABLE escrow_cases ADD COLUMN IF NOT EXISTS payment_rejected_at TIMESTAMPTZ` },
     { name: 'escrow_seller_evidence_admin_notes', sql: `ALTER TABLE escrow_cases ADD COLUMN IF NOT EXISTS seller_evidence_admin_notes TEXT` },
     { name: 'escrow_packaging_approved_at', sql: `ALTER TABLE escrow_cases ADD COLUMN IF NOT EXISTS packaging_approved_at TIMESTAMPTZ` },

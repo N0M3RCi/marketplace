@@ -76,6 +76,7 @@ interface PaymentAddress {
   cryptoNetwork: string;
   instructions: string;
   qrCodeUrl?: string;
+  iconUrl?: string;
 }
 
 const NETWORK_ICONS: Record<string, string> = {
@@ -204,6 +205,7 @@ export default function EscrowCaseDetail() {
         cryptoNetwork: addr.cryptoNetwork,
         instructions: addr.instructions || '',
         qrCodeUrl: addr.qrCodeUrl || undefined,
+        iconUrl: addr.iconUrl || undefined,
       });
       setAvailableAddresses([]);
       toast.success(`Selected ${addr.cryptoNetwork} address`);
@@ -485,9 +487,13 @@ export default function EscrowCaseDetail() {
                             onClick={() => handleSelectAddress(addr)}
                             className="flex items-center gap-4 p-4 rounded-xl border-2 border-border hover:border-[hsl(var(--brand-navy))]/40 hover:bg-[hsl(var(--brand-navy))]/3 transition-all text-left w-full"
                           >
-                            <div className={`w-10 h-10 rounded-full flex items-center justify-center text-lg font-bold flex-shrink-0 ${colorClass}`}>
-                              {icon}
-                            </div>
+                            {addr.iconUrl ? (
+                              <img src={addr.iconUrl} alt={addr.cryptoNetwork} className="w-10 h-10 rounded-full object-contain border border-border bg-white flex-shrink-0" />
+                            ) : (
+                              <div className={`w-10 h-10 rounded-full flex items-center justify-center text-lg font-bold flex-shrink-0 ${colorClass}`}>
+                                {icon}
+                              </div>
+                            )}
                             <div className="flex-1 min-w-0">
                               <p className="text-sm font-bold text-foreground">{addr.cryptoNetwork}</p>
                               <p className="text-xs font-mono text-muted-foreground truncate mt-0.5">{addr.cryptoAddress}</p>
@@ -509,9 +515,13 @@ export default function EscrowCaseDetail() {
                 {isBuyer && paymentAddress && !escrowCase.paymentVerifiedAt && (
                   <div className="rounded-2xl border-2 border-[hsl(var(--brand-navy))]/20 bg-gradient-to-br from-[hsl(var(--brand-navy))]/3 to-transparent p-5">
                     <div className="flex items-center gap-2 mb-4">
-                      <div className="w-8 h-8 rounded-full bg-[hsl(var(--brand-navy))] flex items-center justify-center text-white font-bold text-sm">
-                        {NETWORK_ICONS[paymentAddress.cryptoNetwork] || '₮'}
-                      </div>
+                      {paymentAddress.iconUrl ? (
+                        <img src={paymentAddress.iconUrl} alt={paymentAddress.cryptoNetwork} className="w-8 h-8 rounded-full object-contain border border-border bg-white flex-shrink-0" />
+                      ) : (
+                        <div className="w-8 h-8 rounded-full bg-[hsl(var(--brand-navy))] flex items-center justify-center text-white font-bold text-sm">
+                          {NETWORK_ICONS[paymentAddress.cryptoNetwork] || '₮'}
+                        </div>
+                      )}
                       <div>
                         <p className="text-sm font-bold text-foreground">Send Payment To</p>
                         <p className="text-xs text-muted-foreground">{paymentAddress.cryptoNetwork}</p>
