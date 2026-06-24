@@ -25,6 +25,7 @@ import Analytics from "./pages/admin/Analytics";
 import AdminUsers from "./pages/admin/Users";
 import AuditLogs from "./pages/admin/AuditLogs";
 import CreateListing from "./pages/CreateListing";
+import BulkUpload from "./pages/BulkUpload";
 import Wallet from "./pages/Wallet";
 import PaymentSettings from "./pages/admin/PaymentSettings";
 import AdminListings from "./pages/admin/Listings";
@@ -56,6 +57,7 @@ const App = () => (
             <Route path="/messages" element={<Messages />} />
             <Route path="/escrow/:id" element={<EscrowCaseDetail />} />
             <Route path="/sell" element={<CreateListing />} />
+            <Route path="/sell/bulk" element={<BulkUpload />} />
             <Route path="/wallet" element={<Wallet />} />
             <Route path="/profile" element={<Profile />} />
             <Route path="/settings" element={<Dashboard />} />
