@@ -367,6 +367,13 @@ router.put('/payment-settings/:id', async (req: AuthRequest, res) => {
   } catch (err: any) { res.status(500).json({ error: err.message }); }
 });
 
+router.delete('/payment-settings/:id', async (req: AuthRequest, res) => {
+  try {
+    await pool.query('DELETE FROM payment_settings WHERE id=$1', [req.params.id]);
+    res.json({ ok: true });
+  } catch (err: any) { res.status(500).json({ error: err.message }); }
+});
+
 // ============ MESSAGES (admin view) ============
 router.get('/messages', async (_req: AuthRequest, res) => {
   try {

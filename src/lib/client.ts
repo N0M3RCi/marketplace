@@ -194,6 +194,8 @@ export const admin = {
       request('/api/admin/payment-settings', { method: 'POST', body: JSON.stringify(data) }),
     update: (id: string, data: any) =>
       request(`/api/admin/payment-settings/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+    delete: (id: string) =>
+      request(`/api/admin/payment-settings/${id}`, { method: 'DELETE' }),
   },
   messages: {
     list: () => request('/api/admin/messages'),

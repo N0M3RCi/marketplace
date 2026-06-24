@@ -31,6 +31,7 @@ export default function PaymentSettings() {
   const [settings, setSettings] = useState<PaymentSetting[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [deleting, setDeleting] = useState<string | null>(null);
   const [showAddForm, setShowAddForm] = useState(false);
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -129,6 +130,19 @@ export default function PaymentSettings() {
 
   const handleToggleActive = async (s: PaymentSetting) => {
     await handleUpdate(s.id, { ...s, isActive: !s.isActive });
+  };
+
+  const handleDelete = async (id: string) => {
+    if (!confirm('Are you sure you want to permanently delete this payment address? This action cannot be undone.')) return;
+    setDeleting(id);
+    try {
+      await admin.paymentSettings.delete(id);
+      toast.success('Payment address deleted');
+      await fetchSettings();
+    } catch {
+      toast.error('Failed to delete payment address');
+    }
+    setDeleting(null);
   };
 
   const getNetworkConfig = (network: string) => NETWORKS.find(n => n.value === network) || NETWORKS[0];
@@ -352,6 +366,16 @@ export default function PaymentSettings() {
                     >
                       {isEditing ? 'Cancel' : 'Edit'}
                     </button>
+                    {!s.isActive && (
+                      <button
+                        onClick={() => handleDelete(s.id)}
+                        disabled={deleting === s.id}
+                        className="px-3 py-1.5 text-xs font-medium rounded-lg border border-red-200 text-red-600 hover:bg-red-50 transition-colors flex items-center gap-1"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                        {deleting === s.id ? 'Deleting...' : 'Delete'}
+                      </button>
+                    )}
                   </div>
                 </div>
 
