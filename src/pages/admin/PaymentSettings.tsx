@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { Settings, Save, Plus, Copy, CheckCircle, Bitcoin, Shield, Trash2, Eye, EyeOff, Upload, Image as ImageIcon, X } from 'lucide-react';
+import { Settings, Save, Plus, Copy, CheckCircle, Bitcoin, Shield, Trash2, Eye, EyeOff, Upload, Image as ImageIcon, X, Wallet, Smartphone, Banknote } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { admin, storage } from '@/lib/client';
 import { toast } from 'sonner';
@@ -7,6 +7,7 @@ import { cn } from '@/lib/utils';
 
 interface PaymentSetting {
   id: string;
+  method: string;
   cryptoAddress: string;
   cryptoNetwork: string;
   qrCodeUrl?: string;
@@ -16,6 +17,13 @@ interface PaymentSetting {
   createdAt: string;
   updatedAt?: string;
 }
+
+const PAYMENT_METHODS = [
+  { value: 'crypto', label: 'Crypto', description: 'Wallet address', icon: Bitcoin },
+  { value: 'venmo', label: 'Venmo', description: '@Venmo tag', icon: Smartphone },
+  { value: 'cashapp', label: 'CashApp', description: '$Cashtag', icon: Wallet },
+  { value: 'zelle', label: 'Zelle', description: 'Email or phone', icon: Banknote },
+];
 
 const NETWORKS = [
   { value: 'USDT-TRC20', label: 'USDT (TRC-20 / Tron)', symbol: '₮', color: 'text-emerald-600', bg: 'bg-emerald-50' },
@@ -38,6 +46,7 @@ export default function PaymentSettings() {
   const [uploadingIcon, setUploadingIcon] = useState(false);
 
   const [form, setForm] = useState({
+    method: 'crypto',
     cryptoAddress: '',
     cryptoNetwork: 'USDT-TRC20',
     instructions: 'Send the exact amount to the address above. Include your Case ID in the transaction memo/reference. Payment confirmation may take 10–30 minutes.',
@@ -50,6 +59,7 @@ export default function PaymentSettings() {
       const data: any[] = await admin.paymentSettings.list();
       setSettings(data.map((s: any) => ({
         id: s.id,
+        method: s.method || 'crypto',
         cryptoAddress: s.cryptoAddress || s.crypto_address,
         cryptoNetwork: s.cryptoNetwork || s.crypto_network,
         qrCodeUrl: s.qrCodeUrl || s.qr_code_url,
@@ -90,23 +100,25 @@ export default function PaymentSettings() {
   };
 
   const handleAdd = async () => {
-    if (!form.cryptoAddress.trim()) { toast.error('Crypto address is required'); return; }
+    if (!form.cryptoAddress.trim()) { toast.error('Account identifier is required'); return; }
     setSaving(true);
 
+    const methodLabel = PAYMENT_METHODS.find(m => m.value === form.method)?.label || form.method;
     try {
       await admin.paymentSettings.create({
+        method: form.method,
         crypto_address: form.cryptoAddress.trim(),
-        crypto_network: form.cryptoNetwork,
+        crypto_network: methodLabel,
         instructions: form.instructions.trim(),
         qr_code_url: form.qrCodeUrl.trim() || null,
         icon_url: form.iconUrl.trim() || null,
       });
-      toast.success('Payment address added successfully');
+      toast.success(`${methodLabel} payment method added`);
       setShowAddForm(false);
-      setForm({ cryptoAddress: '', cryptoNetwork: 'USDT-TRC20', instructions: 'Send the exact amount to the address above. Include your Case ID in the transaction memo/reference. Payment confirmation may take 10–30 minutes.', qrCodeUrl: '', iconUrl: '' });
+      setForm({ method: 'crypto', cryptoAddress: '', cryptoNetwork: 'USDT-TRC20', instructions: 'Send the exact amount to the address above. Include your Case ID in the transaction memo/reference. Payment confirmation may take 10–30 minutes.', qrCodeUrl: '', iconUrl: '' });
       await fetchSettings();
     } catch {
-      toast.error('Failed to add payment address');
+      toast.error('Failed to add payment method');
     }
     setSaving(false);
   };
@@ -114,6 +126,7 @@ export default function PaymentSettings() {
   const handleUpdate = async (id: string, updates: Partial<PaymentSetting>) => {
     try {
       await admin.paymentSettings.update(id, {
+        method: updates.method,
         crypto_address: updates.cryptoAddress,
         crypto_network: updates.cryptoNetwork,
         instructions: updates.instructions,
@@ -146,6 +159,7 @@ export default function PaymentSettings() {
   };
 
   const getNetworkConfig = (network: string) => NETWORKS.find(n => n.value === network) || NETWORKS[0];
+  const getMethodLabel = (method: string) => PAYMENT_METHODS.find(m => m.value === method)?.label || method;
 
   if (loading) return (
     <div className="p-8 flex items-center justify-center">
@@ -184,45 +198,95 @@ export default function PaymentSettings() {
       {/* Add Form */}
       {showAddForm && (
         <div className="bg-white rounded-xl border border-[hsl(var(--brand-navy))]/20 p-6 mb-6 shadow-sm">
-          <h2 className="font-heading font-semibold text-foreground mb-5">Add Payment Address</h2>
+          <h2 className="font-heading font-semibold text-foreground mb-5">Add Payment Method</h2>
           <div className="space-y-4">
+            {/* Method Selector */}
             <div>
-              <label className="block text-sm font-medium mb-1.5">Network / Currency</label>
-              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2">
-                {NETWORKS.map(net => (
+              <label className="block text-sm font-medium mb-1.5">Payment Method</label>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                {PAYMENT_METHODS.map(pm => (
                   <button
-                    key={net.value}
+                    key={pm.value}
                     type="button"
-                    onClick={() => setForm(p => ({ ...p, cryptoNetwork: net.value }))}
+                    onClick={() => {
+                      const defaults: Record<string, string> = {
+                        venmo: '@username',
+                        cashapp: '$Cashtag',
+                        zelle: 'email@example.com',
+                        crypto: '',
+                      };
+                      setForm(p => ({
+                        ...p,
+                        method: pm.value,
+                        cryptoAddress: p.cryptoAddress === defaults[p.method] || p.cryptoAddress === '' ? defaults[pm.value as keyof typeof defaults] || '' : p.cryptoAddress,
+                        cryptoNetwork: pm.value === 'crypto' ? p.cryptoNetwork : pm.label,
+                      }));
+                    }}
                     className={cn(
-                      'flex items-center gap-2 px-3 py-2.5 rounded-xl border text-xs font-medium transition-all',
-                      form.cryptoNetwork === net.value
+                      'flex items-center gap-2 px-3 py-3 rounded-xl border text-xs font-medium transition-all',
+                      form.method === pm.value
                         ? 'border-[hsl(var(--brand-navy))] bg-[hsl(var(--brand-navy))]/5 text-[hsl(var(--brand-navy))]'
                         : 'border-border text-muted-foreground hover:border-muted-foreground'
                     )}
                   >
-                    <span className={cn('w-6 h-6 rounded-full flex items-center justify-center text-sm font-bold flex-shrink-0', net.bg, net.color)}>
-                      {net.symbol}
-                    </span>
-                    <span className="truncate">{net.value}</span>
+                    <pm.icon className="w-4 h-4" />
+                    <span>{pm.label}</span>
                   </button>
                 ))}
               </div>
             </div>
 
+            {/* Crypto: Network Selector */}
+            {form.method === 'crypto' && (
+              <div>
+                <label className="block text-sm font-medium mb-1.5">Network / Currency</label>
+                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2">
+                  {NETWORKS.map(net => (
+                    <button
+                      key={net.value}
+                      type="button"
+                      onClick={() => setForm(p => ({ ...p, cryptoNetwork: net.value }))}
+                      className={cn(
+                        'flex items-center gap-2 px-3 py-2.5 rounded-xl border text-xs font-medium transition-all',
+                        form.cryptoNetwork === net.value
+                          ? 'border-[hsl(var(--brand-navy))] bg-[hsl(var(--brand-navy))]/5 text-[hsl(var(--brand-navy))]'
+                          : 'border-border text-muted-foreground hover:border-muted-foreground'
+                      )}
+                    >
+                      <span className={cn('w-6 h-6 rounded-full flex items-center justify-center text-sm font-bold flex-shrink-0', net.bg, net.color)}>
+                        {net.symbol}
+                      </span>
+                      <span className="truncate">{net.value}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Account Identifier */}
             <div>
-              <label className="block text-sm font-medium mb-1.5">Wallet Address <span className="text-red-500">*</span></label>
+              <label className="block text-sm font-medium mb-1.5">
+                {form.method === 'venmo' ? 'Venmo Tag' : form.method === 'cashapp' ? '$Cashtag' : form.method === 'zelle' ? 'Zelle Email / Phone' : 'Wallet Address'} <span className="text-red-500">*</span>
+              </label>
               <input
                 type="text"
                 value={form.cryptoAddress}
                 onChange={e => setForm(p => ({ ...p, cryptoAddress: e.target.value }))}
-                placeholder="e.g. TQn9Y2khEsLJW1ChVWFMSMeRDow5KcbLSE"
+                placeholder={
+                  form.method === 'venmo' ? '@username' :
+                  form.method === 'cashapp' ? '$Cashtag' :
+                  form.method === 'zelle' ? 'email@example.com or phone number' :
+                  'e.g. TQn9Y2khEsLJW1ChVWFMSMeRDow5KcbLSE'
+                }
                 className="w-full px-4 py-2.5 text-sm font-mono border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-[hsl(var(--brand-navy))]"
               />
             </div>
 
+            {/* Icon */}
             <div>
-              <label className="block text-sm font-medium mb-1.5">Crypto Icon <span className="text-muted-foreground text-xs">(optional — upload or paste URL)</span></label>
+              <label className="block text-sm font-medium mb-1.5">
+                {form.method === 'crypto' ? 'Crypto Icon' : 'App Logo'} <span className="text-muted-foreground text-xs">(optional — upload or paste URL)</span>
+              </label>
               <div className="flex items-center gap-3">
                 {form.iconUrl ? (
                   <div className="relative w-12 h-12 rounded-xl border border-border overflow-hidden flex-shrink-0 bg-white">
@@ -244,7 +308,7 @@ export default function PaymentSettings() {
                     type="url"
                     value={form.iconUrl}
                     onChange={e => setForm(p => ({ ...p, iconUrl: e.target.value }))}
-                    placeholder="https://example.com/bitcoin-logo.png"
+                    placeholder="https://example.com/logo.png"
                     className="flex-1 px-4 py-2.5 text-sm border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-[hsl(var(--brand-navy))]"
                   />
                   <label className={cn(
@@ -296,7 +360,7 @@ export default function PaymentSettings() {
                 disabled={saving || !form.cryptoAddress.trim()}
                 className="navy-gradient text-white border-0 hover:opacity-90"
               >
-                {saving ? 'Saving...' : 'Save Address'}
+                {saving ? 'Saving...' : 'Save Payment Method'}
               </Button>
               <Button variant="outline" onClick={() => setShowAddForm(false)}>Cancel</Button>
             </div>
@@ -319,6 +383,9 @@ export default function PaymentSettings() {
           {settings.map(s => {
             const net = getNetworkConfig(s.cryptoNetwork);
             const isEditing = editingId === s.id;
+            const methodConfig = PAYMENT_METHODS.find(m => m.value === s.method);
+            const MethodIcon = methodConfig?.icon || Bitcoin;
+            const isCrypto = s.method === 'crypto' || !s.method || !methodConfig;
 
             return (
               <div key={s.id} className={cn(
@@ -329,14 +396,21 @@ export default function PaymentSettings() {
                   <div className="flex items-center gap-3">
                     {s.iconUrl ? (
                       <img src={s.iconUrl} alt={s.cryptoNetwork} className="w-10 h-10 rounded-xl object-contain border border-border bg-white flex-shrink-0" />
-                    ) : (
+                    ) : isCrypto ? (
                       <div className={cn('w-10 h-10 rounded-xl flex items-center justify-center text-lg font-bold flex-shrink-0', net.bg, net.color)}>
                         {net.symbol}
+                      </div>
+                    ) : (
+                      <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 bg-white border border-border">
+                        <MethodIcon className="w-5 h-5" style={{ color: '#2A1A00' }} />
                       </div>
                     )}
                     <div>
                       <div className="flex items-center gap-2">
-                        <p className="font-semibold text-sm text-foreground">{net.label}</p>
+                        <p className="font-semibold text-sm text-foreground">{isCrypto ? net.label : (methodConfig?.label || s.cryptoNetwork)}</p>
+                        <span className="text-[10px] px-1.5 py-0.5 rounded-full font-medium" style={{ background: isCrypto ? 'rgba(200,160,60,0.12)' : isCrypto === false ? 'rgba(0,150,200,0.12)' : 'rgba(200,160,60,0.12)', color: isCrypto ? '#C68000' : '#0077A0' }}>
+                          {isCrypto ? 'Crypto' : (methodConfig?.label || s.method)}
+                        </span>
                         <span className={cn(
                           'text-[10px] px-2 py-0.5 rounded-full font-semibold',
                           s.isActive ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-600'
@@ -433,6 +507,7 @@ function EditAddressForm({
   onCancel: () => void;
 }) {
   const [form, setForm] = useState({
+    method: setting.method || 'crypto',
     cryptoAddress: setting.cryptoAddress,
     cryptoNetwork: setting.cryptoNetwork,
     instructions: setting.instructions,
@@ -453,21 +528,56 @@ function EditAddressForm({
     setUploadingIcon(false);
   };
 
+  const isCrypto = form.method === 'crypto' || !form.method;
+
   return (
     <div className="mt-4 pt-4 border-t border-border space-y-4">
-      <div className="grid sm:grid-cols-2 gap-4">
-        <div>
-          <label className="block text-xs font-medium mb-1.5">Network</label>
-          <select
-            value={form.cryptoNetwork}
-            onChange={e => setForm(p => ({ ...p, cryptoNetwork: e.target.value }))}
-            className="w-full px-3 py-2.5 text-sm border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-[hsl(var(--brand-navy))] bg-white"
-          >
-            {NETWORKS.map(n => <option key={n.value} value={n.value}>{n.label}</option>)}
-          </select>
+      {/* Method selector in edit */}
+      <div>
+        <label className="block text-xs font-medium mb-1.5">Payment Method</label>
+        <div className="grid grid-cols-4 gap-2">
+          {PAYMENT_METHODS.map(pm => (
+            <button
+              key={pm.value}
+              type="button"
+              onClick={() => setForm(p => ({ ...p, method: pm.value, cryptoNetwork: pm.value === 'crypto' ? 'USDT-TRC20' : pm.label }))}
+              className={cn(
+                'flex items-center justify-center gap-1.5 px-2 py-2 rounded-lg border text-[11px] font-medium transition-all',
+                form.method === pm.value
+                  ? 'border-[hsl(var(--brand-navy))] bg-[hsl(var(--brand-navy))]/5 text-[hsl(var(--brand-navy))]'
+                  : 'border-border text-muted-foreground hover:border-muted-foreground'
+              )}
+            >
+              <pm.icon className="w-3.5 h-3.5" />
+              {pm.label}
+            </button>
+          ))}
         </div>
+      </div>
+
+      <div className="grid sm:grid-cols-2 gap-4">
+        {isCrypto ? (
+          <div>
+            <label className="block text-xs font-medium mb-1.5">Network</label>
+            <select
+              value={form.cryptoNetwork}
+              onChange={e => setForm(p => ({ ...p, cryptoNetwork: e.target.value }))}
+              className="w-full px-3 py-2.5 text-sm border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-[hsl(var(--brand-navy))] bg-white"
+            >
+              {NETWORKS.map(n => <option key={n.value} value={n.value}>{n.label}</option>)}
+            </select>
+          </div>
+        ) : (
+          <div>
+            <label className="block text-xs font-medium mb-1.5">App</label>
+            <input readOnly value={form.cryptoNetwork}
+              className="w-full px-3 py-2.5 text-sm border border-border rounded-xl bg-muted/30 text-muted-foreground" />
+          </div>
+        )}
         <div>
-          <label className="block text-xs font-medium mb-1.5">Wallet Address</label>
+          <label className="block text-xs font-medium mb-1.5">
+            {form.method === 'venmo' ? 'Venmo Tag' : form.method === 'cashapp' ? '$Cashtag' : form.method === 'zelle' ? 'Zelle Email / Phone' : 'Wallet Address'}
+          </label>
           <input
             type="text"
             value={form.cryptoAddress}
@@ -478,7 +588,7 @@ function EditAddressForm({
       </div>
       <div>
         <label className="block text-xs font-medium mb-1.5">
-          Crypto Icon <span className="text-muted-foreground">(optional)</span>
+          {isCrypto ? 'Crypto Icon' : 'App Logo'} <span className="text-muted-foreground">(optional)</span>
         </label>
         <div className="flex items-center gap-3">
           {form.iconUrl ? (
@@ -500,7 +610,7 @@ function EditAddressForm({
             type="url"
             value={form.iconUrl}
             onChange={e => setForm(p => ({ ...p, iconUrl: e.target.value }))}
-            placeholder="https://example.com/bitcoin-logo.png"
+            placeholder="https://example.com/logo.png"
             className="flex-1 px-3 py-2 text-sm border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-[hsl(var(--brand-navy))]"
           />
           <label className={cn(

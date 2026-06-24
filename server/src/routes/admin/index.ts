@@ -454,10 +454,10 @@ router.post('/payment-settings', async (req: AuthRequest, res) => {
 
 router.put('/payment-settings/:id', async (req: AuthRequest, res) => {
   try {
-    const { crypto_address, crypto_network, instructions, qr_code_url, is_active, icon_url } = req.body;
+    const { crypto_address, crypto_network, instructions, qr_code_url, is_active, icon_url, method } = req.body;
     await pool.query(
-      `UPDATE payment_settings SET crypto_address=$1, crypto_network=$2, instructions=$3, qr_code_url=$4, is_active=$5, icon_url=$6, updated_at=NOW() WHERE id=$7`,
-      [crypto_address, crypto_network, instructions || null, qr_code_url || null, is_active !== undefined ? is_active : true, icon_url || null, req.params.id]
+      `UPDATE payment_settings SET method=COALESCE($1,method), crypto_address=$2, crypto_network=$3, instructions=$4, qr_code_url=$5, is_active=$6, icon_url=$7, updated_at=NOW() WHERE id=$8`,
+      [method || null, crypto_address, crypto_network, instructions || null, qr_code_url || null, is_active !== undefined ? is_active : true, icon_url || null, req.params.id]
     );
     res.json({ ok: true });
   } catch (err: any) { res.status(500).json({ error: err.message }); }

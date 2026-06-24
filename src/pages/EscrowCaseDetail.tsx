@@ -72,6 +72,7 @@ interface TimelineEvent {
 
 interface PaymentAddress {
   id: string;
+  method?: string;
   cryptoAddress: string;
   cryptoNetwork: string;
   instructions: string;
@@ -81,6 +82,13 @@ interface PaymentAddress {
 
 const NETWORK_ICONS: Record<string, string> = {
   'USDT-TRC20': '₮', 'USDT-ERC20': '₮', 'BTC': '₿', 'ETH': 'Ξ', 'USDC-ERC20': '$', 'BNB-BEP20': '♦', 'SOL': '◎'
+};
+
+const METHOD_CONFIG: Record<string, { label: string; identifierLabel: string }> = {
+  venmo: { label: 'Venmo', identifierLabel: '@Venmo Tag' },
+  cashapp: { label: 'CashApp', identifierLabel: '$Cashtag' },
+  zelle: { label: 'Zelle', identifierLabel: 'Zelle Email/Phone' },
+  crypto: { label: 'Crypto', identifierLabel: 'Wallet Address' },
 };
 
 export default function EscrowCaseDetail() {
@@ -202,7 +210,7 @@ export default function EscrowCaseDetail() {
     } catch {}
     setPaymentAddress(null);
     setShowPaymentForm(false);
-    setPaymentForm({ txHash: '', amountSent: '', method: 'crypto' });
+    setPaymentForm({ txHash: '', amountSent: '', method: paymentAddress?.method || 'crypto' });
     setPaymentProofFile(null);
     toast.info('Payment selection cancelled');
     await fetchCase();
@@ -222,6 +230,7 @@ export default function EscrowCaseDetail() {
       });
       setPaymentAddress({
         id: addr.id,
+        method: addr.method || 'crypto',
         cryptoAddress: addr.cryptoAddress,
         cryptoNetwork: addr.cryptoNetwork,
         instructions: addr.instructions || '',
@@ -254,7 +263,7 @@ export default function EscrowCaseDetail() {
         status: 'payment_submitted',
         payment_address: paymentAddress?.cryptoAddress,
         payment_network: paymentAddress?.cryptoNetwork,
-        payment_method: paymentForm.method,
+        payment_method: paymentAddress?.method || 'crypto',
         payment_reference: paymentForm.txHash.trim(),
         payment_amount_sent: Number(paymentForm.amountSent),
         payment_proof_url: proofUrl,
@@ -491,6 +500,9 @@ export default function EscrowCaseDetail() {
                     <p className="text-xs text-muted-foreground">Choose a crypto network to make your payment</p>
                     <div className="grid gap-3">
                       {availableAddresses.map((addr: any) => {
+                        const addrMethod = addr.method || 'crypto';
+                        const methodCfg = METHOD_CONFIG[addrMethod] || METHOD_CONFIG.crypto;
+                        const isCrypto = addrMethod === 'crypto';
                         const icon = NETWORK_ICONS[addr.cryptoNetwork] || '₮';
                         const colors: Record<string, string> = {
                           'USDT-TRC20': 'text-emerald-600 bg-emerald-50',
@@ -510,13 +522,17 @@ export default function EscrowCaseDetail() {
                           >
                             {addr.iconUrl ? (
                               <img src={addr.iconUrl} alt={addr.cryptoNetwork} className="w-10 h-10 rounded-full object-contain border border-border bg-white flex-shrink-0" />
-                            ) : (
+                            ) : isCrypto ? (
                               <div className={`w-10 h-10 rounded-full flex items-center justify-center text-lg font-bold flex-shrink-0 ${colorClass}`}>
                                 {icon}
                               </div>
+                            ) : (
+                              <div className="w-10 h-10 rounded-full flex items-center justify-center text-lg font-bold flex-shrink-0 bg-white border-2 border-gray-200">
+                                {addrMethod === 'venmo' ? 'V' : addrMethod === 'cashapp' ? '$' : 'Z'}
+                              </div>
                             )}
                             <div className="flex-1 min-w-0">
-                              <p className="text-sm font-bold text-foreground">{addr.cryptoNetwork}</p>
+                              <p className="text-sm font-bold text-foreground">{isCrypto ? addr.cryptoNetwork : methodCfg.label}</p>
                               <p className="text-xs font-mono text-muted-foreground truncate mt-0.5">{addr.cryptoAddress}</p>
                               {addr.instructions && (
                                 <p className="text-[11px] text-muted-foreground/70 mt-1 line-clamp-1">{addr.instructions}</p>
@@ -538,6 +554,10 @@ export default function EscrowCaseDetail() {
                     <div className="flex items-center gap-2 mb-4">
                       {paymentAddress.iconUrl ? (
                         <img src={paymentAddress.iconUrl} alt={paymentAddress.cryptoNetwork} className="w-8 h-8 rounded-full object-contain border border-border bg-white flex-shrink-0" />
+                      ) : paymentAddress.method !== 'crypto' ? (
+                        <div className="w-8 h-8 rounded-full bg-white border-2 border-gray-200 flex items-center justify-center font-bold text-sm">
+                          {paymentAddress.method === 'venmo' ? 'V' : paymentAddress.method === 'cashapp' ? '$' : 'Z'}
+                        </div>
                       ) : (
                         <div className="w-8 h-8 rounded-full bg-[hsl(var(--brand-navy))] flex items-center justify-center text-white font-bold text-sm">
                           {NETWORK_ICONS[paymentAddress.cryptoNetwork] || '₮'}
@@ -550,16 +570,18 @@ export default function EscrowCaseDetail() {
                     </div>
 
                     <div className="flex gap-3 mb-4">
-                      {(paymentAddress.qrCodeUrl || qrDataUrl) && (
+                      {paymentAddress.method === 'crypto' && (paymentAddress.qrCodeUrl || qrDataUrl) && (
                         <img src={qrDataUrl || paymentAddress.qrCodeUrl} alt="QR" className="w-24 h-24 rounded-xl border border-border bg-white p-1 flex-shrink-0" />
                       )}
-                      {!paymentAddress.qrCodeUrl && !qrDataUrl && paymentAddress.cryptoAddress && (
+                      {paymentAddress.method === 'crypto' && !paymentAddress.qrCodeUrl && !qrDataUrl && paymentAddress.cryptoAddress && (
                         <div className="w-24 h-24 rounded-xl border border-border bg-muted flex items-center justify-center flex-shrink-0">
                           <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
                         </div>
                       )}
                       <div className="flex-1 min-w-0">
-                        <p className="text-[11px] text-muted-foreground mb-1.5 font-semibold uppercase tracking-wider">Wallet Address</p>
+                        <p className="text-[11px] text-muted-foreground mb-1.5 font-semibold uppercase tracking-wider">
+                          {paymentAddress.method === 'venmo' ? '@Venmo Tag' : paymentAddress.method === 'cashapp' ? '$Cashtag' : paymentAddress.method === 'zelle' ? 'Zelle Email/Phone' : 'Wallet Address'}
+                        </p>
                         <div className="flex items-center gap-2 bg-white border-2 border-border rounded-xl px-3 py-2.5">
                           <code className="text-xs font-mono flex-1 break-all text-foreground">{paymentAddress.cryptoAddress}</code>
                           <button onClick={copyAddress} className="flex-shrink-0 text-muted-foreground hover:text-foreground transition-colors p-1">
@@ -575,7 +597,7 @@ export default function EscrowCaseDetail() {
                         <p className="font-bold text-[hsl(var(--brand-navy))]">{formatCurrency(escrowCase.amount + escrowCase.fees, escrowCase.currency)}</p>
                       </div>
                       <div className="p-3 bg-white rounded-xl border border-border">
-                        <p className="text-[11px] text-muted-foreground">Network</p>
+                        <p className="text-[11px] text-muted-foreground">Method</p>
                         <p className="font-bold">{paymentAddress.cryptoNetwork}</p>
                       </div>
                     </div>
@@ -607,9 +629,9 @@ export default function EscrowCaseDetail() {
                   <div className="space-y-4 p-4 bg-muted/30 rounded-xl border border-border">
                     <h3 className="font-semibold text-sm">Confirm Your Payment</h3>
                     <div>
-                      <label className="block text-xs font-medium mb-1.5">Transaction Hash / Reference <span className="text-red-500">*</span></label>
+                      <label className="block text-xs font-medium mb-1.5">{paymentAddress?.method === 'crypto' ? 'Transaction Hash / Reference' : 'Payment Reference / Confirmation ID'} <span className="text-red-500">*</span></label>
                       <input value={paymentForm.txHash} onChange={e => setPaymentForm(p => ({ ...p, txHash: e.target.value }))}
-                        placeholder="e.g. 0x1a2b3c4d... or payment reference"
+                        placeholder={paymentAddress?.method === 'crypto' ? 'e.g. 0x1a2b3c4d... or payment reference' : 'e.g. Confirmation ID or receipt number'}
                         className="w-full px-3 py-2.5 text-sm font-mono border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-[hsl(var(--brand-navy))]" />
                     </div>
                     <div>
@@ -666,7 +688,7 @@ export default function EscrowCaseDetail() {
                       <Button
                         onClick={() => {
                           // Reset form so buyer can resubmit
-                          setPaymentForm({ txHash: '', amountSent: '', method: 'crypto' });
+                          setPaymentForm({ txHash: '', amountSent: '', method: paymentAddress?.method || 'crypto' });
                           setPaymentProofFile(null);
                           setShowPaymentForm(true);
                         }}
