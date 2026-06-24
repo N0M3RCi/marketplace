@@ -1,5 +1,6 @@
 // Centralized API client for the marketplace backend
 const API = '';
+const REQUEST_TIMEOUT_MS = 30_000;
 
 async function request(path: string, options: RequestInit = {}) {
   const token = localStorage.getItem('auth_token');
@@ -8,13 +9,26 @@ async function request(path: string, options: RequestInit = {}) {
     ...(options.headers as Record<string, string> || {}),
   };
   if (token) headers['Authorization'] = `Bearer ${token}`;
-  const res = await fetch(`${API}${path}`, { ...options, headers });
-  if (!res.ok) {
-    const body = await res.json().catch(() => ({ error: res.statusText }));
-    const msg = body.error || `Request failed: ${res.status}`;
-    throw new Error(`[${res.status}] ${msg}`);
+
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+
+  try {
+    const res = await fetch(`${API}${path}`, { ...options, headers, signal: controller.signal });
+    clearTimeout(timeoutId);
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({ error: res.statusText }));
+      const msg = body.error || `Request failed: ${res.status}`;
+      throw new Error(`[${res.status}] ${msg}`);
+    }
+    return res.json();
+  } catch (err: any) {
+    clearTimeout(timeoutId);
+    if (err.name === 'AbortError') {
+      throw new Error('[408] Request timed out — the server may be unavailable');
+    }
+    throw err;
   }
-  return res.json();
 }
 
 // Auth
