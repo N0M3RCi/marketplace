@@ -93,10 +93,7 @@ export default function ListingCard({ listing, onFavorite }: ListingCardProps) {
             </div>
           </div>
 
-          <div className="flex items-center gap-1.5 mt-3 pt-3 border-t border-border/50">
-            <span className="text-xs text-muted-foreground truncate">{listing.sellerName}</span>
-          </div>
-        </div>
+                  </div>
       </div>
     </Link>
   );
