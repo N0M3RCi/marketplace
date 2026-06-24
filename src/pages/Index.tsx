@@ -690,14 +690,14 @@ export default function Index() {
           {/* Dynamic Category Cards */}
           {(() => {
             const topCategories = categories
-              .filter(c => !c.parentId && c.listingCount > 0)
+              .filter(c => !c.parentId)
               .sort((a, b) => b.listingCount - a.listingCount)
               .slice(0, 4);
 
             if (topCategories.length === 0) {
               return (
                 <div className="text-center py-12">
-                  <p className="text-sm" style={{ color: '#9A7C40' }}>No categories with active listings yet</p>
+                  <p className="text-sm" style={{ color: '#9A7C40' }}>No categories selected for the homepage yet</p>
                 </div>
               );
             }

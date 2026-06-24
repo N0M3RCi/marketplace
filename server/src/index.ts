@@ -20,6 +20,7 @@ import reviewsRoutes from './routes/reviews.js';
 import sellerRequestRoutes from './routes/sellerRequests.js';
 import currencyRoutes from './routes/currency.js';
 import featuredListingsRoutes from './routes/featuredListings.js';
+import paymentAddressesRoutes from './routes/paymentAddresses.js';
 import adminRoutes from './routes/admin/index.js';
 import { setupSocket } from './socket.js';
 
@@ -29,12 +30,6 @@ const PORT = parseInt(process.env.PORT || '3001', 10);
 
 // Ready flag: blocked until migrations complete
 let dbReady = false;
-
-// Block API requests until migrations finish — port is still open for Railway health
-app.use('/api', (_req, res, next) => {
-  if (dbReady) return next();
-  res.status(503).json({ error: 'Service initializing, please try again in a moment' });
-});
 
 // Middleware
 app.use(cors());
@@ -50,12 +45,22 @@ app.use((err: any, _req: express.Request, res: express.Response, next: express.N
   next(err);
 });
 
-// API routes (no auth required)
+// API routes (no auth required) — registered BEFORE dbReady middleware so login
+// and registration are never blocked during migrations
 app.use('/api/auth', authRoutes);
 app.use('/api/categories', categoriesRoutes);
 app.use('/api/featured-listings', featuredListingsRoutes);
 app.use('/api/currency', currencyRoutes);
 app.use('/api/storage/file', storageFileRouter); // Public file retrieval (for chat images/files)
+
+// Block non-auth API requests until migrations finish — port is still open for Railway health
+app.use('/api', (req, _res, next) => {
+  // Auth routes are already handled above — this catches everything else
+  if (dbReady) return next();
+  // Let auth routes through even if DB isn't ready (their own error handling will manage)
+  if (req.path.startsWith('/auth/')) return next();
+  _res.status(503).json({ error: 'Service initializing, please try again in a moment' });
+});
 
 // API routes (auth required)
 app.use('/api/listings', listingsRoutes);
@@ -69,6 +74,7 @@ app.use('/api/storage', storageRoutes);
 app.use('/api/profile', authMiddleware, profileRoutes);
 app.use('/api/reviews', authMiddleware, reviewsRoutes);
 app.use('/api/seller-requests', authMiddleware, sellerRequestRoutes);
+app.use('/api/payment-addresses', authMiddleware, paymentAddressesRoutes);
 app.use('/api/admin', authMiddleware, adminRoutes);
 
 // Health check (includes database status)
@@ -181,6 +187,18 @@ async function runMigrations() {
       )` },
     { name: 'categories_homepage_featured', sql: `ALTER TABLE categories ADD COLUMN IF NOT EXISTS homepage_featured BOOLEAN DEFAULT false` },
     { name: 'categories_image_url', sql: `ALTER TABLE categories ADD COLUMN IF NOT EXISTS image_url TEXT` },
+    { name: 'payment_settings_instructions', sql: `ALTER TABLE payment_settings ADD COLUMN IF NOT EXISTS instructions TEXT` },
+    { name: 'payment_settings_qr_code_url', sql: `ALTER TABLE payment_settings ADD COLUMN IF NOT EXISTS qr_code_url TEXT` },
+    { name: 'escrow_payment_rejected_at', sql: `ALTER TABLE escrow_cases ADD COLUMN IF NOT EXISTS payment_rejected_at TIMESTAMPTZ` },
+    { name: 'escrow_seller_evidence_admin_notes', sql: `ALTER TABLE escrow_cases ADD COLUMN IF NOT EXISTS seller_evidence_admin_notes TEXT` },
+    { name: 'escrow_packaging_approved_at', sql: `ALTER TABLE escrow_cases ADD COLUMN IF NOT EXISTS packaging_approved_at TIMESTAMPTZ` },
+    { name: 'escrow_pickup_scheduled_at', sql: `ALTER TABLE escrow_cases ADD COLUMN IF NOT EXISTS pickup_scheduled_at TIMESTAMPTZ` },
+    { name: 'escrow_delivered_at', sql: `ALTER TABLE escrow_cases ADD COLUMN IF NOT EXISTS delivered_at TIMESTAMPTZ` },
+    { name: 'escrow_dispute_opened_by', sql: `ALTER TABLE escrow_cases ADD COLUMN IF NOT EXISTS dispute_opened_by TEXT` },
+    { name: 'escrow_dispute_admin_notes', sql: `ALTER TABLE escrow_cases ADD COLUMN IF NOT EXISTS dispute_admin_notes TEXT` },
+    { name: 'escrow_dispute_resolved_at', sql: `ALTER TABLE escrow_cases ADD COLUMN IF NOT EXISTS dispute_resolved_at TIMESTAMPTZ` },
+    { name: 'escrow_funds_released_at', sql: `ALTER TABLE escrow_cases ADD COLUMN IF NOT EXISTS funds_released_at TIMESTAMPTZ` },
+    { name: 'escrow_refunded_at', sql: `ALTER TABLE escrow_cases ADD COLUMN IF NOT EXISTS refunded_at TIMESTAMPTZ` },
   ];
 
   let allOk = true;

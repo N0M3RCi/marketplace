@@ -3,7 +3,7 @@ import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { Shield, Bell, Search, Menu, X, ChevronDown, LogOut, Settings, User, LayoutDashboard, MessageSquare, Wallet, Plus, DollarSign } from 'lucide-react';
 import { cn, getInitials } from '@/lib/utils';
 import { useAuth } from '@/hooks/useAuth';
-import { fetchNotifications, markNotificationRead } from '@/lib/api';
+import { fetchNotifications, markAllNotificationsRead } from '@/lib/api';
 import { formatRelativeTime } from '@/lib/utils';
 import { useCurrencyStore, SUPPORTED_CURRENCIES } from '@/lib/currencyStore';
 import type { Notification } from '@/types';
@@ -39,7 +39,7 @@ export default function Navbar() {
   };
 
   const handleMarkAllRead = () => {
-    notifications.filter(n => !n.isRead).forEach(n => markNotificationRead(n.id).catch(() => {}));
+    markAllNotificationsRead().catch(() => {});
     setNotifications(prev => prev.map(n => ({ ...n, isRead: true })));
   };
 

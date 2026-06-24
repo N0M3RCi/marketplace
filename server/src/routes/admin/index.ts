@@ -322,22 +322,45 @@ router.get('/payment-reviews', async (_req: AuthRequest, res) => {
 router.get('/payment-settings', async (_req: AuthRequest, res) => {
   try {
     const result = await pool.query('SELECT * FROM payment_settings ORDER BY created_at DESC');
-    res.json(result.rows);
+    res.json(result.rows.map((s: any) => ({
+      id: s.id,
+      method: s.method,
+      cryptoAddress: s.crypto_address,
+      cryptoNetwork: s.crypto_network,
+      instructions: s.instructions || '',
+      qrCodeUrl: s.qr_code_url || null,
+      isActive: s.is_active,
+      createdAt: s.created_at,
+      updatedAt: s.updated_at,
+      // also keep snake_case for compatibility
+      crypto_address: s.crypto_address,
+      crypto_network: s.crypto_network,
+      is_active: s.is_active,
+      qr_code_url: s.qr_code_url,
+      created_at: s.created_at,
+      updated_at: s.updated_at,
+    })));
   } catch (err: any) { res.status(500).json({ error: err.message }); }
 });
 
 router.post('/payment-settings', async (req: AuthRequest, res) => {
   try {
-    const { method, crypto_address, crypto_network } = req.body;
-    await pool.query('INSERT INTO payment_settings (method, crypto_address, crypto_network) VALUES ($1,$2,$3)',
-      [method, crypto_address, crypto_network]);
+    const { method, crypto_address, crypto_network, instructions, qr_code_url } = req.body;
+    await pool.query(
+      'INSERT INTO payment_settings (method, crypto_address, crypto_network, instructions, qr_code_url) VALUES ($1,$2,$3,$4,$5)',
+      [method || 'crypto', crypto_address, crypto_network, instructions || null, qr_code_url || null]
+    );
     res.status(201).json({ ok: true });
   } catch (err: any) { res.status(500).json({ error: err.message }); }
 });
 
 router.put('/payment-settings/:id', async (req: AuthRequest, res) => {
   try {
-    await pool.query('UPDATE payment_settings SET is_active=false WHERE id=$1', [req.params.id]);
+    const { crypto_address, crypto_network, instructions, qr_code_url, is_active } = req.body;
+    await pool.query(
+      `UPDATE payment_settings SET crypto_address=$1, crypto_network=$2, instructions=$3, qr_code_url=$4, is_active=$5, updated_at=NOW() WHERE id=$6`,
+      [crypto_address, crypto_network, instructions || null, qr_code_url || null, is_active !== undefined ? is_active : true, req.params.id]
+    );
     res.json({ ok: true });
   } catch (err: any) { res.status(500).json({ error: err.message }); }
 });
@@ -408,7 +431,21 @@ router.get('/analytics', async (_req: AuthRequest, res) => {
 router.get('/categories', async (_req: AuthRequest, res) => {
   try {
     const result = await pool.query('SELECT * FROM categories ORDER BY name');
-    res.json(result.rows.map((c: any) => ({ ...c, parent_id: c.parent_id || null })));
+    res.json(result.rows.map((c: any) => ({
+      id: c.id,
+      name: c.name,
+      slug: c.slug,
+      icon: c.icon || 'Tag',
+      color: c.color || 'text-gray-600',
+      parent_id: c.parent_id || null,
+      listing_count: c.listing_count || 0,
+      homepage_featured: !!c.homepage_featured,
+      image_url: c.image_url || null,
+      parentId: c.parent_id || null,
+      listingCount: c.listing_count || 0,
+      homepageFeatured: !!c.homepage_featured,
+      imageUrl: c.image_url || null,
+    })));
   } catch (err: any) { res.status(500).json({ error: err.message }); }
 });
 

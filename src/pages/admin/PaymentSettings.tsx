@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Settings, Save, Plus, Copy, CheckCircle, Bitcoin, Shield, Trash2, Eye, EyeOff } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { supabase } from '@/lib/supabase';
+import { admin } from '@/lib/client';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 
@@ -42,22 +42,21 @@ export default function PaymentSettings() {
   });
 
   const fetchSettings = async () => {
-    const { data, error } = await supabase
-      .from('payment_settings')
-      .select('*')
-      .order('created_at', { ascending: false });
-
-    if (error) { toast.error('Failed to load payment settings'); return; }
-    setSettings((data || []).map((s: any) => ({
-      id: s.id,
-      cryptoAddress: s.crypto_address,
-      cryptoNetwork: s.crypto_network,
-      qrCodeUrl: s.qr_code_url,
-      instructions: s.instructions || '',
-      isActive: s.is_active,
-      createdAt: s.created_at,
-      updatedAt: s.updated_at,
-    })));
+    try {
+      const data: any[] = await admin.paymentSettings.list();
+      setSettings(data.map((s: any) => ({
+        id: s.id,
+        cryptoAddress: s.cryptoAddress || s.crypto_address,
+        cryptoNetwork: s.cryptoNetwork || s.crypto_network,
+        qrCodeUrl: s.qrCodeUrl || s.qr_code_url,
+        instructions: s.instructions || '',
+        isActive: s.isActive !== undefined ? s.isActive : s.is_active,
+        createdAt: s.createdAt || s.created_at,
+        updatedAt: s.updatedAt || s.updated_at,
+      })));
+    } catch {
+      toast.error('Failed to load payment settings');
+    }
   };
 
   useEffect(() => {
@@ -76,43 +75,37 @@ export default function PaymentSettings() {
     if (!form.cryptoAddress.trim()) { toast.error('Crypto address is required'); return; }
     setSaving(true);
 
-    const { data, error } = await supabase
-      .from('payment_settings')
-      .insert({
+    try {
+      await admin.paymentSettings.create({
         crypto_address: form.cryptoAddress.trim(),
         crypto_network: form.cryptoNetwork,
         instructions: form.instructions.trim(),
         qr_code_url: form.qrCodeUrl.trim() || null,
-        is_active: true,
-      })
-      .select()
-      .single();
-
-    if (error) { toast.error('Failed to add payment address'); setSaving(false); return; }
-
-    toast.success('Payment address added successfully');
-    setShowAddForm(false);
-    setForm({ cryptoAddress: '', cryptoNetwork: 'USDT-TRC20', instructions: 'Send the exact amount to the address above. Include your Case ID in the transaction memo/reference. Payment confirmation may take 10–30 minutes.', qrCodeUrl: '' });
-    await fetchSettings();
+      });
+      toast.success('Payment address added successfully');
+      setShowAddForm(false);
+      setForm({ cryptoAddress: '', cryptoNetwork: 'USDT-TRC20', instructions: 'Send the exact amount to the address above. Include your Case ID in the transaction memo/reference. Payment confirmation may take 10–30 minutes.', qrCodeUrl: '' });
+      await fetchSettings();
+    } catch {
+      toast.error('Failed to add payment address');
+    }
     setSaving(false);
   };
 
   const handleUpdate = async (id: string, updates: Partial<PaymentSetting>) => {
-    const { error } = await supabase
-      .from('payment_settings')
-      .update({
+    try {
+      await admin.paymentSettings.update(id, {
         crypto_address: updates.cryptoAddress,
         crypto_network: updates.cryptoNetwork,
         instructions: updates.instructions,
         is_active: updates.isActive,
-        updated_at: new Date().toISOString(),
-      })
-      .eq('id', id);
-
-    if (error) { toast.error('Failed to update'); return; }
-    toast.success('Settings updated');
-    await fetchSettings();
-    setEditingId(null);
+      });
+      toast.success('Settings updated');
+      await fetchSettings();
+      setEditingId(null);
+    } catch {
+      toast.error('Failed to update');
+    }
   };
 
   const handleToggleActive = async (s: PaymentSetting) => {

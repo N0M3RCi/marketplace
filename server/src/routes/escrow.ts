@@ -42,6 +42,7 @@ router.get('/:id', async (req: AuthRequest, res) => {
       paymentProofUrl: e.payment_proof_url,
       paymentAmountSent: e.payment_amount_sent ? Number(e.payment_amount_sent) : undefined,
       paymentSubmittedAt: e.payment_submitted_at, paymentVerifiedAt: e.payment_verified_at,
+      paymentRejectedAt: e.payment_rejected_at,
       paymentAdminNotes: e.payment_admin_notes,
       sellerItemPhotos: e.seller_item_photos || [], sellerPackagingPhotos: e.seller_packaging_photos || [],
       sellerPackagingVideo: e.seller_packaging_video,

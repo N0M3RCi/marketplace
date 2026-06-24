@@ -7,8 +7,7 @@ import {
 import Navbar from '@/components/layout/Navbar';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/hooks/useAuth';
-import { supabase } from '@/lib/supabase';
-import { sellerRequests as sellerReqApi } from '@/lib/client';
+import { sellerRequests as sellerReqApi, notifications as notificationsApi, escrow as escrowApi } from '@/lib/client';
 import { formatCurrency, formatDate, formatRelativeTime, cn } from '@/lib/utils';
 import { ESCROW_STATUS_CONFIG } from '@/constants';
 import type { EscrowStatus } from '@/types';
@@ -53,56 +52,41 @@ export default function Dashboard() {
   const [sellerRequestReason, setSellerRequestReason] = useState('');
   const [submittingRequest, setSubmittingRequest] = useState(false);
 
-  const fetchCases = useCallback(async (userId: string) => {
-    const { data, error } = await supabase
-      .from('escrow_cases')
-      .select(`
-        id, case_number, listing_title, buyer_id, seller_id,
-        amount, currency, status, created_at, updated_at,
-        buyer:user_profiles!escrow_cases_buyer_id_fkey(username),
-        seller:user_profiles!escrow_cases_seller_id_fkey(username)
-      `)
-      .or(`buyer_id.eq.${userId},seller_id.eq.${userId}`)
-      .order('updated_at', { ascending: false });
-
-    if (error) {
-      console.error('Error fetching cases:', error);
-      return;
+  const fetchCases = useCallback(async () => {
+    try {
+      const data: any[] = await escrowApi.list();
+      setCases(data.map((c: any) => ({
+        id: c.id,
+        caseNumber: c.case_number || c.caseNumber,
+        listingTitle: c.listing_title || c.listingTitle,
+        buyerId: c.buyer_id || c.buyerId,
+        sellerId: c.seller_id || c.sellerId,
+        buyerName: c.buyer_name || c.buyerName || 'Unknown',
+        sellerName: c.seller_name || c.sellerName || 'Unknown',
+        amount: Number(c.amount),
+        currency: c.currency || 'USD',
+        status: c.status,
+        createdAt: c.created_at || c.createdAt,
+        updatedAt: c.updated_at || c.updatedAt,
+      })));
+    } catch {
+      console.error('Error fetching cases');
     }
-
-    setCases((data || []).map((c: any) => ({
-      id: c.id,
-      caseNumber: c.case_number || c.caseNumber,
-      listingTitle: c.listing_title || c.listingTitle,
-      buyerId: c.buyer_id || c.buyerId,
-      sellerId: c.seller_id || c.sellerId,
-      buyerName: c.buyer_name || c.buyerName || c.buyer?.username || 'Unknown',
-      sellerName: c.seller_name || c.sellerName || c.seller?.username || 'Unknown',
-      amount: Number(c.amount),
-      currency: c.currency || 'USD',
-      status: c.status,
-      createdAt: c.created_at || c.createdAt,
-      updatedAt: c.updated_at || c.updatedAt,
-    })));
   }, []);
 
-  const fetchNotifications = useCallback(async (userId: string) => {
-    const { data } = await supabase
-      .from('notifications')
-      .select('*')
-      .eq('user_id', userId)
-      .order('created_at', { ascending: false })
-      .limit(20);
-
-    setNotifications((data || []).map((n: any) => ({
-      id: n.id,
-      type: n.type,
-      title: n.title,
-      message: n.message,
-      caseId: n.case_id || n.caseId,
-      isRead: n.is_read || n.isRead,
-      createdAt: n.created_at || n.createdAt,
-    })));
+  const fetchNotifications = useCallback(async () => {
+    try {
+      const data: any[] = await notificationsApi.list(20);
+      setNotifications(data.map((n: any) => ({
+        id: n.id,
+        type: n.type,
+        title: n.title,
+        message: n.message,
+        caseId: n.caseId || n.case_id,
+        isRead: n.isRead || n.is_read,
+        createdAt: n.createdAt || n.created_at,
+      })));
+    } catch {}
   }, []);
 
   useEffect(() => {
@@ -112,14 +96,14 @@ export default function Dashboard() {
 
     setCasesLoading(true);
     Promise.all([
-      fetchCases(authUser.id),
-      fetchNotifications(authUser.id),
+      fetchCases(),
+      fetchNotifications(),
     ]).finally(() => setCasesLoading(false));
 
     // Check existing seller request
     if (authUser.role === 'buyer') {
-      supabase.from('seller_requests').select('status').eq('user_id', authUser.id).order('created_at', { ascending: false }).limit(1).single()
-        .then(({ data }) => { if (data) setSellerRequestStatus(data.status as any); })
+      sellerReqApi.my()
+        .then((data: any) => { const reqs = Array.isArray(data) ? data : [data]; if (reqs.length > 0) setSellerRequestStatus(reqs[0].status); })
         .catch(() => {});
     }
   }, [authUser, authLoading, navigate, fetchCases, fetchNotifications]);
@@ -140,14 +124,16 @@ export default function Dashboard() {
   const handleRefresh = async () => {
     if (!authUser) return;
     setRefreshing(true);
-    await Promise.all([fetchCases(authUser.id), fetchNotifications(authUser.id)]);
+    await Promise.all([fetchCases(), fetchNotifications()]);
     setRefreshing(false);
     toast.success('Refreshed');
   };
 
   const markNotifRead = async (notifId: string) => {
-    await supabase.from('notifications').update({ is_read: true }).eq('id', notifId);
-    setNotifications(prev => prev.map(n => n.id === notifId ? { ...n, isRead: true } : n));
+    try {
+      await notificationsApi.markRead(notifId);
+      setNotifications(prev => prev.map(n => n.id === notifId ? { ...n, isRead: true } : n));
+    } catch {}
   };
 
   if (authLoading) return (
@@ -351,7 +337,7 @@ export default function Dashboard() {
                 {unreadNotifs > 0 && (
                   <button
                     onClick={async () => {
-                      await supabase.from('notifications').update({ is_read: true }).eq('user_id', authUser.id);
+                      try { await notificationsApi.markAllRead(); } catch {}
                       setNotifications(prev => prev.map(n => ({ ...n, isRead: true })));
                     }}
                     className="text-[11px] transition-colors"

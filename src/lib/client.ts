@@ -129,6 +129,11 @@ export const sellerRequests = {
     request('/api/seller-requests', { method: 'POST', body: JSON.stringify({ reason }) }),
 };
 
+// Payment Addresses (public)
+export const paymentAddresses = {
+  list: () => request('/api/payment-addresses'),
+};
+
 // Admin API
 export const admin = {
   users: {
@@ -187,8 +192,8 @@ export const admin = {
     list: () => request('/api/admin/payment-settings'),
     create: (data: any) =>
       request('/api/admin/payment-settings', { method: 'POST', body: JSON.stringify(data) }),
-    deactivate: (id: string) =>
-      request(`/api/admin/payment-settings/${id}`, { method: 'PUT' }),
+    update: (id: string, data: any) =>
+      request(`/api/admin/payment-settings/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
   },
   messages: {
     list: () => request('/api/admin/messages'),

@@ -7,7 +7,7 @@ import {
 } from 'lucide-react';
 import Navbar from '@/components/layout/Navbar';
 import { Button } from '@/components/ui/button';
-import { escrow, storage } from '@/lib/client';
+import { escrow, storage, paymentAddresses } from '@/lib/client';
 import { useAuth } from '@/hooks/useAuth';
 import { formatCurrency, formatDateTime, formatDate, cn } from '@/lib/utils';
 import { ESCROW_STATUS_CONFIG, DISPUTE_REASONS } from '@/constants';
@@ -36,6 +36,7 @@ interface EscrowCaseData {
   paymentAmountSent?: number;
   paymentSubmittedAt?: string;
   paymentVerifiedAt?: string;
+  paymentRejectedAt?: string;
   paymentAdminNotes?: string;
   sellerItemPhotos: string[];
   sellerPackagingPhotos: string[];
@@ -90,6 +91,8 @@ export default function EscrowCaseDetail() {
   const [escrowCase, setEscrowCase] = useState<EscrowCaseData | null>(null);
   const [timeline, setTimeline] = useState<TimelineEvent[]>([]);
   const [paymentAddress, setPaymentAddress] = useState<PaymentAddress | null>(null);
+  const [availableAddresses, setAvailableAddresses] = useState<any[]>([]);
+  const [selectingAddress, setSelectingAddress] = useState(false);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [copied, setCopied] = useState(false);
@@ -157,6 +160,19 @@ export default function EscrowCaseDetail() {
     fetchCase().finally(() => setLoading(false));
   }, [id, user]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Fetch available payment addresses when case has none assigned
+  useEffect(() => {
+    if (!escrowCase || !user) return;
+    const isBuyer = escrowCase.buyerId === user.id;
+    if (isBuyer && escrowCase.status === 'awaiting_payment' && !escrowCase.paymentAddress) {
+      paymentAddresses.list()
+        .then((addresses: any[]) => setAvailableAddresses(addresses.filter((a: any) => a.isActive !== false)))
+        .catch(() => {});
+    } else {
+      setAvailableAddresses([]);
+    }
+  }, [escrowCase?.paymentAddress, escrowCase?.status, user?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+
   // Generate QR code dynamically when payment address is available
   useEffect(() => {
     if (paymentAddress?.cryptoAddress) {
@@ -172,6 +188,28 @@ export default function EscrowCaseDetail() {
       setCopied(true);
       toast.success('Address copied!');
       setTimeout(() => setCopied(false), 2000);
+    }
+  };
+
+  const handleSelectAddress = async (addr: any) => {
+    try {
+      await escrow.update(id!, {
+        payment_address: addr.cryptoAddress,
+        payment_network: addr.cryptoNetwork,
+        payment_admin_notes: addr.instructions || null,
+      });
+      setPaymentAddress({
+        id: addr.id,
+        cryptoAddress: addr.cryptoAddress,
+        cryptoNetwork: addr.cryptoNetwork,
+        instructions: addr.instructions || '',
+        qrCodeUrl: addr.qrCodeUrl || undefined,
+      });
+      setAvailableAddresses([]);
+      toast.success(`Selected ${addr.cryptoNetwork} address`);
+      setShowPaymentForm(true);
+    } catch {
+      toast.error('Failed to select address');
     }
   };
 
@@ -358,7 +396,7 @@ export default function EscrowCaseDetail() {
   const isBuyer = escrowCase.buyerId === user.id;
   const isSeller = escrowCase.sellerId === user.id;
   const isAdmin = user.role === 'admin';
-  const canSubmitPayment = isBuyer && escrowCase.status === 'awaiting_payment' && !escrowCase.paymentSubmittedAt;
+  const canSubmitPayment = isBuyer && escrowCase.status === 'awaiting_payment' && (!escrowCase.paymentSubmittedAt || escrowCase.paymentRejectedAt);
   const canSubmitEvidence = isSeller && ['seller_notified', 'item_ready'].includes(escrowCase.status);
   const canConfirmReceipt = isBuyer && escrowCase.status === 'delivered';
   const canOpenDispute = (isBuyer || isSeller) && ['in_transit', 'delivered', 'packaging_approved'].includes(escrowCase.status) && escrowCase.status !== 'disputed';
@@ -423,6 +461,50 @@ export default function EscrowCaseDetail() {
                 )}
               </div>
               <div className="p-5 space-y-4">
+                {/* Select Payment Address - shown when no address assigned yet */}
+                {isBuyer && escrowCase.status === 'awaiting_payment' && !escrowCase.paymentAddress && availableAddresses.length > 0 && !paymentAddress && (
+                  <div className="space-y-3">
+                    <h3 className="font-heading font-semibold text-sm text-foreground">Select Your Payment Method</h3>
+                    <p className="text-xs text-muted-foreground">Choose a crypto network to make your payment</p>
+                    <div className="grid gap-3">
+                      {availableAddresses.map((addr: any) => {
+                        const icon = NETWORK_ICONS[addr.cryptoNetwork] || '₮';
+                        const colors: Record<string, string> = {
+                          'USDT-TRC20': 'text-emerald-600 bg-emerald-50',
+                          'USDT-ERC20': 'text-blue-600 bg-blue-50',
+                          'BTC': 'text-amber-600 bg-amber-50',
+                          'ETH': 'text-indigo-600 bg-indigo-50',
+                          'USDC-ERC20': 'text-blue-500 bg-blue-50',
+                          'BNB-BEP20': 'text-yellow-600 bg-yellow-50',
+                          'SOL': 'text-purple-600 bg-purple-50',
+                        };
+                        const colorClass = colors[addr.cryptoNetwork] || 'text-gray-600 bg-gray-50';
+                        return (
+                          <button
+                            key={addr.id}
+                            onClick={() => handleSelectAddress(addr)}
+                            className="flex items-center gap-4 p-4 rounded-xl border-2 border-border hover:border-[hsl(var(--brand-navy))]/40 hover:bg-[hsl(var(--brand-navy))]/3 transition-all text-left w-full"
+                          >
+                            <div className={`w-10 h-10 rounded-full flex items-center justify-center text-lg font-bold flex-shrink-0 ${colorClass}`}>
+                              {icon}
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <p className="text-sm font-bold text-foreground">{addr.cryptoNetwork}</p>
+                              <p className="text-xs font-mono text-muted-foreground truncate mt-0.5">{addr.cryptoAddress}</p>
+                              {addr.instructions && (
+                                <p className="text-[11px] text-muted-foreground/70 mt-1 line-clamp-1">{addr.instructions}</p>
+                              )}
+                            </div>
+                            <div className="flex-shrink-0">
+                              <span className="text-xs text-[hsl(var(--brand-navy))] font-semibold">Pay with this &rarr;</span>
+                            </div>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+
                 {/* Crypto Payment Address */}
                 {isBuyer && paymentAddress && !escrowCase.paymentVerifiedAt && (
                   <div className="rounded-2xl border-2 border-[hsl(var(--brand-navy))]/20 bg-gradient-to-br from-[hsl(var(--brand-navy))]/3 to-transparent p-5">
@@ -523,8 +605,37 @@ export default function EscrowCaseDetail() {
                     <Clock className="w-5 h-5 text-amber-600 flex-shrink-0" />
                     <div>
                       <p className="text-sm font-semibold text-amber-800">Payment Submitted — Awaiting Verification</p>
-                      <p className="text-xs text-amber-700 mt-0.5">Submitted {formatDateTime(escrowCase.paymentSubmittedAt)} · Tx: {escrowCase.paymentReference}</p>
+                      <p className="text-xs text-amber-700 mt-0.5 break-all">Submitted {formatDateTime(escrowCase.paymentSubmittedAt)} · Tx: {escrowCase.paymentReference}</p>
                     </div>
+                  </div>
+                )}
+
+                {/* Payment rejected — show resend button */}
+                {escrowCase.paymentRejectedAt && !escrowCase.paymentVerifiedAt && (
+                  <div className="space-y-3">
+                    <div className="flex items-start gap-3 p-4 bg-red-50 border border-red-200 rounded-xl">
+                      <AlertTriangle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
+                      <div>
+                        <p className="text-sm font-semibold text-red-800">Payment Rejected by Administrator</p>
+                        {escrowCase.paymentAdminNotes && (
+                          <p className="text-xs text-red-700 mt-1.5 italic leading-relaxed">"{escrowCase.paymentAdminNotes}"</p>
+                        )}
+                        <p className="text-xs text-red-600 mt-1.5">Your payment proof was not accepted. Please send the correct amount to the address below and resubmit.</p>
+                      </div>
+                    </div>
+                    {!showPaymentForm && (
+                      <Button
+                        onClick={() => {
+                          // Reset form so buyer can resubmit
+                          setPaymentForm({ txHash: '', amountSent: '', method: 'crypto' });
+                          setPaymentProofFile(null);
+                          setShowPaymentForm(true);
+                        }}
+                        className="w-full navy-gradient text-white border-0 hover:opacity-90"
+                      >
+                        <Send className="w-4 h-4 mr-2" /> Resend Payment Proof
+                      </Button>
+                    )}
                   </div>
                 )}
 
@@ -838,7 +949,7 @@ export default function EscrowCaseDetail() {
                       </div>
                       <div className="pb-3 flex-1 min-w-0">
                         <p className="text-xs font-semibold text-foreground leading-tight">{event.label}</p>
-                        {event.notes && <p className="text-[11px] text-muted-foreground mt-0.5 leading-snug">{event.notes}</p>}
+                        {event.notes && <p className="text-[11px] text-muted-foreground mt-0.5 leading-snug break-words">{event.notes}</p>}
                         <p className="text-[10px] text-muted-foreground/60 mt-1">{formatDateTime(event.timestamp)}</p>
                       </div>
                     </div>

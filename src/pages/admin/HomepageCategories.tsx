@@ -38,11 +38,12 @@ export default function HomepageCategories() {
       c.id === cat.id ? { ...c, homepageFeatured: newVal } : c
     ));
     try {
-      await fetch(`/api/admin/categories/${cat.id}/homepage-featured`, {
+      const res = await fetch(`/api/admin/categories/${cat.id}/homepage-featured`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${localStorage.getItem('auth_token')}` },
         body: JSON.stringify({ featured: newVal }),
       });
+      if (!res.ok) throw new Error((await res.json().catch(() => ({ error: 'Request failed' }))).error || 'Request failed');
       toast.success(newVal ? `"${cat.name}" is now on the homepage` : `"${cat.name}" removed from homepage`);
     } catch (err: any) {
       // Revert on error
@@ -304,9 +305,8 @@ export default function HomepageCategories() {
             <div>
               <p className="text-sm font-semibold mb-0.5" style={{ color: '#1A1000' }}>Live Preview</p>
               <p className="text-xs" style={{ color: '#9A7C40' }}>
-                Changes take effect immediately. The top 4 featured categories (with active listings) will appear on
-                the homepage in the "Browse by Category" section. Categories without active listings won't display
-                until they have at least one active listing.
+                Changes take effect immediately. The top 4 featured categories will appear on
+                the homepage in the "Browse by Category" section.
               </p>
             </div>
           </div>

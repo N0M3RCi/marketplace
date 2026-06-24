@@ -82,3 +82,7 @@ export async function fetchNotifications(userId: string) {
 export async function markNotificationRead(notifId: string) {
   return client.notifications.markRead(notifId);
 }
+
+export async function markAllNotificationsRead() {
+  return client.notifications.markAllRead();
+}
