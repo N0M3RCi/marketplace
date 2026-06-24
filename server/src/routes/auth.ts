@@ -85,7 +85,7 @@ router.post('/login', async (req, res) => {
 router.get('/me', authMiddleware, async (req: AuthRequest, res) => {
   try {
     const result = await queryWithRetry(
-      'SELECT id, email, username, role, avatar_url, is_verified, is_active, rating, total_transactions, phone, created_at FROM user_profiles WHERE id = $1',
+      'SELECT id, email, username, role, avatar_url, is_verified, is_active, status, rating, total_transactions, phone, created_at FROM user_profiles WHERE id = $1',
       [req.userId]
     );
     if (result.rows.length === 0) {
@@ -93,7 +93,7 @@ router.get('/me', authMiddleware, async (req: AuthRequest, res) => {
       return;
     }
     const u = result.rows[0];
-    res.json({ id: u.id, email: u.email, username: u.username, role: u.role, avatar: u.avatar_url, isVerified: u.is_verified, isActive: u.is_active, rating: Number(u.rating), totalTransactions: u.total_transactions, phone: u.phone, createdAt: u.created_at });
+    res.json({ id: u.id, email: u.email, username: u.username, role: u.role, avatar: u.avatar_url, isVerified: u.is_verified, isActive: u.is_active, status: u.status, rating: Number(u.rating), totalTransactions: u.total_transactions, phone: u.phone, createdAt: u.created_at });
   } catch (err: any) {
     console.error('Me error:', err);
     res.status(500).json({ error: 'Failed to load profile, please try again' });

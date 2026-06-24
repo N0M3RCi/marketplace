@@ -64,15 +64,23 @@ router.get('/:id', async (req: AuthRequest, res) => {
 // POST /api/escrow
 router.post('/', async (req: AuthRequest, res) => {
   try {
-    const { listingId, listingTitle, buyerId, sellerId, amount, fees, currency, paymentInstructions } = req.body;
+    const { listingId, listingTitle, sellerId, amount, fees, currency } = req.body;
+    const buyerId = req.userId;
+    if (!buyerId) { res.status(401).json({ error: 'Authentication required' }); return; }
+    if (!sellerId) { res.status(400).json({ error: 'sellerId is required' }); return; }
     const id = `ESC-${Date.now()}-${Math.random().toString(36).slice(2, 6).toUpperCase()}`;
     await pool.query(`
-      INSERT INTO escrow_cases (id, case_number, listing_id, listing_title, buyer_id, seller_id, amount, fees, currency, status, admin_notes, created_at, updated_at)
-      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,'awaiting_payment',$10,NOW(),NOW())`, [
-      id, id, listingId, listingTitle, buyerId, sellerId, amount, fees || 0, currency || 'USD', paymentInstructions || ''
+      INSERT INTO escrow_cases (id, case_number, listing_id, listing_title, buyer_id, seller_id, amount, fees, currency, status, created_at, updated_at)
+      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,'awaiting_payment',NOW(),NOW())`, [
+      id, id, listingId, listingTitle, buyerId, sellerId, amount, fees || 0, currency || 'USD'
     ]);
     // Timeline
     await pool.query(`INSERT INTO escrow_timeline (case_id, status, label, actor_name, actor_role) VALUES ($1,'awaiting_payment','Escrow case created','System','system')`, [id]);
+    // Notify seller
+    try {
+      await pool.query(`INSERT INTO notifications (user_id, type, title, message, case_id) VALUES ($1,'new_escrow_case','New Escrow Case Opened', $2, $3)`,
+        [sellerId, `A buyer has opened an escrow case for your listing "${listingTitle || ''}".`, id]);
+    } catch {}
     res.status(201).json({ id });
   } catch (err: any) {
     res.status(500).json({ error: err.message });

@@ -12,7 +12,6 @@ import { useAuth } from '@/hooks/useAuth';
 import { formatCurrency, formatDate, getInitials, cn } from '@/lib/utils';
 import { useCurrencyStore } from '@/lib/currencyStore';
 import { MOCK_LISTINGS } from '@/lib/mockData';
-import { supabase } from '@/lib/supabase';
 import type { Listing } from '@/types';
 import { toast } from 'sonner';
 
@@ -43,14 +42,22 @@ export default function ListingDetail() {
 
   useEffect(() => {
     // Fetch active payment settings for the escrow modal
-    supabase.from('payment_settings').select('crypto_address, crypto_network').eq('is_active', true).limit(1).single()
-      .then(({ data }) => {
-        if (data) setPaymentSettings({ cryptoAddress: data.crypto_address, cryptoNetwork: data.crypto_network });
-      });
+    fetch('/api/admin/payment-settings')
+      .then(res => res.ok ? res.json() : [])
+      .then((data: any[]) => {
+        const active = Array.isArray(data) ? data.find((s: any) => s.is_active) : null;
+        if (active) setPaymentSettings({ cryptoAddress: active.crypto_address, cryptoNetwork: active.crypto_network });
+      })
+      .catch(() => {});
     // Fetch current user's account status
     if (user) {
-      supabase.from('user_profiles').select('status').eq('id', user.id).single()
-        .then(({ data }) => { if (data?.status) setUserStatus(data.status as any); })
+      fetch(`/api/auth/me`, {
+        headers: { Authorization: `Bearer ${localStorage.getItem('auth_token')}` },
+      })
+        .then(res => res.ok ? res.json() : null)
+        .then((data: any) => {
+          if (data?.status) setUserStatus(data.status);
+        })
         .catch(() => {});
     }
   }, [user]);
@@ -130,53 +137,38 @@ export default function ListingDetail() {
       return;
     }
 
-    // Get active payment settings
-    const { data: paymentData } = await supabase.from('payment_settings').select('*').eq('is_active', true).limit(1).single();
+    try {
+      const token = localStorage.getItem('auth_token');
+      const res = await fetch('/api/escrow', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({
+          listingId: isRealListing ? listing.id : null,
+          listingTitle: listing.title,
+          sellerId: listing.sellerId,
+          amount: listing.price,
+          fees,
+          currency: listing.currency || 'USD',
+        }),
+      });
 
-    const { data: newCase, error } = await supabase.from('escrow_cases').insert({
-      case_number: caseNumber,
-      buyer_id: user.id,
-      seller_id: listing.sellerId,
-      listing_id: isRealListing ? listing.id : null,
-      listing_title: listing.title,
-      amount: listing.price,
-      fees: fees,
-      currency: listing.currency || 'USD',
-      status: 'awaiting_payment',
-      payment_address: paymentData?.crypto_address || null,
-      payment_network: paymentData?.crypto_network || null,
-    }).select('id').single();
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ error: 'Unknown error' }));
+        throw new Error(err.error || `Request failed: ${res.status}`);
+      }
 
-    if (error || !newCase) {
-      toast.error('Failed to create escrow case: ' + (error?.message || 'Unknown error'));
+      const data = await res.json();
+      toast.success(`Escrow case ${caseNumber} created!`);
       setEscrowLoading(false);
-      return;
+      setShowEscrowModal(false);
+      navigate(`/escrow/${data.id}`);
+    } catch (err: any) {
+      toast.error('Failed to create escrow case: ' + (err.message || 'Unknown error'));
+      setEscrowLoading(false);
     }
-
-    // Create initial timeline event
-    await supabase.from('escrow_timeline').insert({
-      case_id: newCase.id,
-      status: 'awaiting_payment',
-      label: 'Escrow Case Created',
-      timestamp: new Date().toISOString(),
-      actor_name: user.username || 'Buyer',
-      actor_role: 'buyer',
-      notes: `Case ${caseNumber} opened for "${listing.title}"`,
-    });
-
-    // Notify seller
-    await supabase.from('notifications').insert({
-      user_id: listing.sellerId,
-      type: 'new_escrow_case',
-      title: 'New Escrow Case Opened',
-      message: `${user.username || 'A buyer'} has opened an escrow case for your listing "${listing.title}".`,
-      case_id: newCase.id,
-    });
-
-    toast.success(`Escrow case ${caseNumber} created!`);
-    setEscrowLoading(false);
-    setShowEscrowModal(false);
-    navigate(`/escrow/${newCase.id}`);
   };
 
   const handleShare = () => {
