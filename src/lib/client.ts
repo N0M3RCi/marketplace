@@ -213,6 +213,15 @@ export const admin = {
     delete: (id: string) =>
       request(`/api/admin/categories/${id}`, { method: 'DELETE' }),
   },
+  featuredListings: {
+    list: () => request('/api/admin/featured-listings'),
+    add: (listingId: string) =>
+      request('/api/admin/featured-listings', { method: 'POST', body: JSON.stringify({ listing_id: listingId }) }),
+    remove: (id: string) =>
+      request(`/api/admin/featured-listings/${id}`, { method: 'DELETE' }),
+    reorder: (ids: string[]) =>
+      request('/api/admin/featured-listings/reorder', { method: 'PUT', body: JSON.stringify({ ids }) }),
+  },
 };
 
 // Currency / exchange rates

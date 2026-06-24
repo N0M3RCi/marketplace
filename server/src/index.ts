@@ -19,6 +19,7 @@ import profileRoutes from './routes/profile.js';
 import reviewsRoutes from './routes/reviews.js';
 import sellerRequestRoutes from './routes/sellerRequests.js';
 import currencyRoutes from './routes/currency.js';
+import featuredListingsRoutes from './routes/featuredListings.js';
 import adminRoutes from './routes/admin/index.js';
 import { setupSocket } from './socket.js';
 
@@ -52,6 +53,7 @@ app.use((err: any, _req: express.Request, res: express.Response, next: express.N
 // API routes (no auth required)
 app.use('/api/auth', authRoutes);
 app.use('/api/categories', categoriesRoutes);
+app.use('/api/featured-listings', featuredListingsRoutes);
 app.use('/api/currency', currencyRoutes);
 app.use('/api/storage/file', storageFileRouter); // Public file retrieval (for chat images/files)
 
@@ -138,6 +140,9 @@ async function runMigrations() {
     { name: 'messages_file_url', sql: `ALTER TABLE messages ADD COLUMN IF NOT EXISTS file_url TEXT` },
     { name: 'messages_file_name', sql: `ALTER TABLE messages ADD COLUMN IF NOT EXISTS file_name TEXT` },
     { name: 'messages_file_size', sql: `ALTER TABLE messages ADD COLUMN IF NOT EXISTS file_size INTEGER` },
+    { name: 'categories_parent_id', sql: `ALTER TABLE categories ADD COLUMN IF NOT EXISTS parent_id UUID REFERENCES categories(id)` },
+    { name: 'featured_listings', sql: `CREATE TABLE IF NOT EXISTS featured_listings (id UUID PRIMARY KEY DEFAULT gen_random_uuid(), listing_id UUID NOT NULL REFERENCES listings(id) ON DELETE CASCADE, sort_order INTEGER DEFAULT 0, added_by UUID REFERENCES user_profiles(id), created_at TIMESTAMPTZ DEFAULT NOW())` },
+    { name: 'featured_listings_unique', sql: `CREATE UNIQUE INDEX IF NOT EXISTS idx_featured_listing_id ON featured_listings(listing_id)` },
   ];
 
   let allOk = true;

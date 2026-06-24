@@ -11,7 +11,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import Navbar from '@/components/layout/Navbar';
 import ListingCard from '@/components/features/ListingCard';
 import { LiquidGlassBackground, GlassCard, GlassPill, GlassButton } from '@/components/features/LiquidGlass';
-import { MOCK_LISTINGS } from '@/lib/mockData';
+import type { Listing } from '@/types';
 
 const STATS = [
 { label: 'Transactions Completed', target: 1893, decimals: 0, prefix: '', suffix: '', display: '1,893', icon: ShieldCheck },
@@ -321,6 +321,8 @@ export default function Index() {
   const [favorites, setFavorites] = useState<string[]>([]);
   const [activeActivity, setActiveActivity] = useState(0);
   const [statsVisible, setStatsVisible] = useState(false);
+  const [featuredListings, setFeaturedListings] = useState<Listing[]>([]);
+  const [featuredLoading, setFeaturedLoading] = useState(true);
   const statsRef = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
 
@@ -335,11 +337,21 @@ export default function Index() {
     return () => observer.disconnect();
   }, []);
 
+  useEffect(() => {
+    fetch('/api/featured-listings')
+      .then(res => res.json())
+      .then(data => {
+        setFeaturedListings(data || []);
+      })
+      .catch(() => {})
+      .finally(() => setFeaturedLoading(false));
+  }, []);
+
   const toggleFavorite = (id: string) => {
     setFavorites((prev) => prev.includes(id) ? prev.filter((f) => f !== id) : [...prev, id]);
   };
 
-  const listingsWithFav = MOCK_LISTINGS.map((l) => ({ ...l, isFavorited: favorites.includes(l.id) }));
+  const listingsWithFav = featuredListings.map((l) => ({ ...l, isFavorited: favorites.includes(l.id) }));
 
   return (
     <div className="min-h-screen" style={{ background: '#FFFDF5' }}>
@@ -797,8 +809,25 @@ export default function Index() {
           </Link>
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-          {listingsWithFav.slice(0, 12).map((listing) =>
-          <ListingCard key={listing.id} listing={listing} onFavorite={toggleFavorite} />
+          {featuredLoading ? (
+            Array.from({ length: 4 }).map((_, i) => (
+              <div key={`skel-${i}`} className="rounded-xl overflow-hidden animate-pulse"
+                style={{ background: 'rgba(200,160,60,0.08)', border: '1px solid rgba(200,160,60,0.12)' }}>
+                <div className="h-40" style={{ background: 'rgba(200,160,60,0.10)' }} />
+                <div className="p-4 space-y-3">
+                  <div className="h-4 w-3/4 rounded" style={{ background: 'rgba(200,160,60,0.12)' }} />
+                  <div className="h-3 w-1/2 rounded" style={{ background: 'rgba(200,160,60,0.08)' }} />
+                </div>
+              </div>
+            ))
+          ) : listingsWithFav.length === 0 ? (
+            <div className="col-span-full text-center py-8">
+              <p className="text-sm" style={{ color: '#9A7C40' }}>No featured listings yet</p>
+            </div>
+          ) : (
+            listingsWithFav.slice(0, 12).map((listing) =>
+              <ListingCard key={listing.id} listing={listing} onFavorite={toggleFavorite} />
+            )
           )}
         </div>
       </section>

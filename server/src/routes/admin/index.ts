@@ -396,31 +396,32 @@ router.get('/analytics', async (_req: AuthRequest, res) => {
 router.get('/categories', async (_req: AuthRequest, res) => {
   try {
     const result = await pool.query('SELECT * FROM categories ORDER BY name');
-    res.json(result.rows);
+    res.json(result.rows.map((c: any) => ({ ...c, parent_id: c.parent_id || null })));
   } catch (err: any) { res.status(500).json({ error: err.message }); }
 });
 
 router.post('/categories', async (req: AuthRequest, res) => {
   try {
-    const { name, slug, icon, color } = req.body;
+    const { name, slug, icon, color, parent_id } = req.body;
     if (!name || !name.trim()) { res.status(400).json({ error: 'Name is required' }); return; }
     const finalSlug = slug || name.trim().toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
     const id = uuid();
     await pool.query(
-      'INSERT INTO categories (id, name, slug, icon, color) VALUES ($1,$2,$3,$4,$5)',
-      [id, name.trim(), finalSlug, icon || 'Tag', color || 'text-gray-600']);
+      'INSERT INTO categories (id, name, slug, icon, color, parent_id) VALUES ($1,$2,$3,$4,$5,$6)',
+      [id, name.trim(), finalSlug, icon || 'Tag', color || 'text-gray-600', parent_id || null]);
     res.status(201).json({ id });
   } catch (err: any) { res.status(500).json({ error: err.message }); }
 });
 
 router.put('/categories/:id', async (req: AuthRequest, res) => {
   try {
-    const { name, slug, icon, color } = req.body;
+    const { name, slug, icon, color, parent_id } = req.body;
     const sets: string[] = []; const vals: any[] = []; let idx = 1;
     if (name !== undefined) { sets.push(`name = $${idx++}`); vals.push(name.trim()); }
     if (slug !== undefined) { sets.push(`slug = $${idx++}`); vals.push(slug); }
     if (icon !== undefined) { sets.push(`icon = $${idx++}`); vals.push(icon); }
     if (color !== undefined) { sets.push(`color = $${idx++}`); vals.push(color); }
+    if (parent_id !== undefined) { sets.push(`parent_id = $${idx++}`); vals.push(parent_id || null); }
     if (sets.length === 0) { res.json({ ok: true }); return; }
     vals.push(req.params.id);
     await pool.query(`UPDATE categories SET ${sets.join(', ')} WHERE id = $${idx}`, vals);
@@ -436,7 +437,82 @@ router.delete('/categories/:id', async (req: AuthRequest, res) => {
       res.status(400).json({ error: 'Cannot delete category — it has associated listings. Reassign them first.' });
       return;
     }
+    // Check if any child categories reference this as parent
+    const childCheck = await pool.query('SELECT COUNT(*) FROM categories WHERE parent_id = $1', [req.params.id]);
+    if (parseInt(childCheck.rows[0].count) > 0) {
+      res.status(400).json({ error: 'Cannot delete category — it has subcategories. Remove or reassign them first.' });
+      return;
+    }
     await pool.query('DELETE FROM categories WHERE id = $1', [req.params.id]);
+    res.json({ ok: true });
+  } catch (err: any) { res.status(500).json({ error: err.message }); }
+});
+
+// ============ FEATURED LISTINGS ============
+router.get('/featured-listings', async (_req: AuthRequest, res) => {
+  try {
+    const result = await pool.query(`
+      SELECT fl.id as featured_id, fl.sort_order, fl.created_at as featured_at,
+        l.*, c.name as c_name, up.username as seller_name
+      FROM featured_listings fl
+      JOIN listings l ON fl.listing_id = l.id
+      LEFT JOIN categories c ON l.category_id = c.id
+      LEFT JOIN user_profiles up ON l.seller_id = up.id
+      ORDER BY fl.sort_order ASC, fl.created_at DESC`);
+    res.json(result.rows.map((r: any) => ({
+      featuredId: r.featured_id,
+      sortOrder: r.sort_order,
+      featuredAt: r.featured_at,
+      id: r.id,
+      title: r.title,
+      description: r.description || '',
+      price: Number(r.price),
+      currency: r.currency || 'USD',
+      condition: r.condition,
+      location: r.location,
+      status: r.status,
+      images: r.images || [],
+      categoryName: r.c_name || 'Uncategorized',
+      sellerName: r.seller_name || 'Unknown',
+      createdAt: r.created_at,
+    })));
+  } catch (err: any) { res.status(500).json({ error: err.message }); }
+});
+
+router.post('/featured-listings', async (req: AuthRequest, res) => {
+  try {
+    const { listing_id } = req.body;
+    if (!listing_id) { res.status(400).json({ error: 'listing_id is required' }); return; }
+    // Check listing exists
+    const listing = await pool.query('SELECT id FROM listings WHERE id = $1', [listing_id]);
+    if (listing.rows.length === 0) { res.status(404).json({ error: 'Listing not found' }); return; }
+    // Check not already featured
+    const existing = await pool.query('SELECT id FROM featured_listings WHERE listing_id = $1', [listing_id]);
+    if (existing.rows.length > 0) { res.status(400).json({ error: 'Listing is already featured' }); return; }
+    // Get next sort order
+    const maxOrder = await pool.query('SELECT COALESCE(MAX(sort_order), -1) + 1 as next FROM featured_listings');
+    const id = uuid();
+    await pool.query(
+      'INSERT INTO featured_listings (id, listing_id, sort_order, added_by) VALUES ($1,$2,$3,$4)',
+      [id, listing_id, maxOrder.rows[0].next, req.userId]);
+    res.status(201).json({ id });
+  } catch (err: any) { res.status(500).json({ error: err.message }); }
+});
+
+router.delete('/featured-listings/:id', async (req: AuthRequest, res) => {
+  try {
+    await pool.query('DELETE FROM featured_listings WHERE id = $1', [req.params.id]);
+    res.json({ ok: true });
+  } catch (err: any) { res.status(500).json({ error: err.message }); }
+});
+
+router.put('/featured-listings/reorder', async (req: AuthRequest, res) => {
+  try {
+    const { ids } = req.body; // Array of featured IDs in new order
+    if (!Array.isArray(ids)) { res.status(400).json({ error: 'ids array is required' }); return; }
+    for (let i = 0; i < ids.length; i++) {
+      await pool.query('UPDATE featured_listings SET sort_order = $1 WHERE id = $2', [i, ids[i]]);
+    }
     res.json({ ok: true });
   } catch (err: any) { res.status(500).json({ error: err.message }); }
 });

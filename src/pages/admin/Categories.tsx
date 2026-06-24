@@ -1,7 +1,7 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo, Fragment } from 'react';
 import {
   Search, Plus, Loader2, RefreshCw, Edit2, X, Save, Trash2,
-  Tag, Hash, Palette, FileText, Image,
+  Tag, Hash, Palette, FileText, ChevronRight, ChevronDown,
 } from 'lucide-react';
 import { admin } from '@/lib/client';
 import { cn } from '@/lib/utils';
@@ -14,6 +14,7 @@ interface Category {
   icon: string;
   listing_count: number;
   color: string;
+  parent_id: string | null;
 }
 
 interface EditForm {
@@ -21,23 +22,24 @@ interface EditForm {
   slug: string;
   icon: string;
   color: string;
+  parentId: string;
 }
 
 const COLORS = [
-  { value: 'text-red-600', label: 'Red',     bg: 'bg-red-100' },
-  { value: 'text-orange-600', label: 'Orange',  bg: 'bg-orange-100' },
-  { value: 'text-amber-600', label: 'Amber',   bg: 'bg-amber-100' },
-  { value: 'text-yellow-600', label: 'Yellow',  bg: 'bg-yellow-100' },
-  { value: 'text-lime-600', label: 'Lime',    bg: 'bg-lime-100' },
+  { value: 'text-red-600', label: 'Red', bg: 'bg-red-100' },
+  { value: 'text-orange-600', label: 'Orange', bg: 'bg-orange-100' },
+  { value: 'text-amber-600', label: 'Amber', bg: 'bg-amber-100' },
+  { value: 'text-yellow-600', label: 'Yellow', bg: 'bg-yellow-100' },
+  { value: 'text-lime-600', label: 'Lime', bg: 'bg-lime-100' },
   { value: 'text-emerald-600', label: 'Emerald', bg: 'bg-emerald-100' },
-  { value: 'text-teal-600', label: 'Teal',    bg: 'bg-teal-100' },
-  { value: 'text-cyan-600', label: 'Cyan',    bg: 'bg-cyan-100' },
-  { value: 'text-blue-600', label: 'Blue',    bg: 'bg-blue-100' },
-  { value: 'text-indigo-600', label: 'Indigo',  bg: 'bg-indigo-100' },
-  { value: 'text-purple-600', label: 'Purple',  bg: 'bg-purple-100' },
-  { value: 'text-pink-600', label: 'Pink',    bg: 'bg-pink-100' },
-  { value: 'text-gray-600', label: 'Gray',    bg: 'bg-gray-100' },
-  { value: 'text-gray-900', label: 'Dark',    bg: 'bg-gray-200' },
+  { value: 'text-teal-600', label: 'Teal', bg: 'bg-teal-100' },
+  { value: 'text-cyan-600', label: 'Cyan', bg: 'bg-cyan-100' },
+  { value: 'text-blue-600', label: 'Blue', bg: 'bg-blue-100' },
+  { value: 'text-indigo-600', label: 'Indigo', bg: 'bg-indigo-100' },
+  { value: 'text-purple-600', label: 'Purple', bg: 'bg-purple-100' },
+  { value: 'text-pink-600', label: 'Pink', bg: 'bg-pink-100' },
+  { value: 'text-gray-600', label: 'Gray', bg: 'bg-gray-100' },
+  { value: 'text-gray-900', label: 'Dark', bg: 'bg-gray-200' },
 ];
 
 const ICONS = ['Tag', 'Package', 'ShoppingBag', 'Gamepad2', 'BookOpen', 'Music', 'Camera', 'Heart', 'Star', 'Shirt', 'Laptop', 'Home', 'Car', 'Gem', 'Watch', 'Armchair', 'Sofa', 'UtensilsCrossed', 'Dumbbell', 'Bike', 'Plane', 'Palmtree', 'Sparkles'];
@@ -48,7 +50,7 @@ export default function AdminCategories() {
   const [refreshing, setRefreshing] = useState(false);
   const [search, setSearch] = useState('');
   const [selectedCat, setSelectedCat] = useState<Category | null>(null);
-  const [editForm, setEditForm] = useState<EditForm>({ name: '', slug: '', icon: 'Tag', color: 'text-gray-600' });
+  const [editForm, setEditForm] = useState<EditForm>({ name: '', slug: '', icon: 'Tag', color: 'text-gray-600', parentId: '' });
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [creating, setCreating] = useState(false);
@@ -68,6 +70,41 @@ export default function AdminCategories() {
     fetchCategories().finally(() => setLoading(false));
   }, [fetchCategories]);
 
+  // Build category lookup and hierarchy
+  const catMap = useMemo(() => {
+    const m = new Map<string, Category>();
+    categories.forEach(c => m.set(c.id, c));
+    return m;
+  }, [categories]);
+
+  const rootCategories = useMemo(() =>
+    categories.filter(c => !c.parent_id),
+    [categories]
+  );
+
+  const getChildren = useCallback((parentId: string) =>
+    categories.filter(c => c.parent_id === parentId),
+    [categories]
+  );
+
+  // Get all descendant IDs (to exclude from parent selection to prevent circular refs)
+  const getDescendantIds = useCallback((catId: string): string[] => {
+    const children = getChildren(catId);
+    const ids: string[] = [];
+    for (const child of children) {
+      ids.push(child.id, ...getDescendantIds(child.id));
+    }
+    return ids;
+  }, [getChildren]);
+
+  const getParentPath = (catId: string | null): string => {
+    if (!catId) return '';
+    const parent = catMap.get(catId);
+    if (!parent) return '';
+    const grandparent = getParentPath(parent.parent_id);
+    return grandparent ? `${grandparent} > ${parent.name}` : parent.name;
+  };
+
   const handleRefresh = async () => {
     setRefreshing(true);
     await fetchCategories();
@@ -77,14 +114,20 @@ export default function AdminCategories() {
   const openCreate = () => {
     setCreating(true);
     setSelectedCat(null);
-    setEditForm({ name: '', slug: '', icon: 'Tag', color: 'text-gray-600' });
+    setEditForm({ name: '', slug: '', icon: 'Tag', color: 'text-gray-600', parentId: '' });
     setShowDeleteConfirm(false);
   };
 
   const openEdit = (cat: Category) => {
     setCreating(false);
     setSelectedCat(cat);
-    setEditForm({ name: cat.name, slug: cat.slug, icon: cat.icon || 'Tag', color: cat.color || 'text-gray-600' });
+    setEditForm({
+      name: cat.name,
+      slug: cat.slug,
+      icon: cat.icon || 'Tag',
+      color: cat.color || 'text-gray-600',
+      parentId: cat.parent_id || '',
+    });
     setShowDeleteConfirm(false);
   };
 
@@ -104,6 +147,7 @@ export default function AdminCategories() {
           slug: editForm.slug || undefined,
           icon: editForm.icon,
           color: editForm.color,
+          parent_id: editForm.parentId || null,
         });
         toast.success('Category created');
       } else if (selectedCat) {
@@ -112,12 +156,13 @@ export default function AdminCategories() {
           slug: editForm.slug,
           icon: editForm.icon,
           color: editForm.color,
+          parent_id: editForm.parentId || null,
         });
         toast.success('Category updated');
       }
       await fetchCategories();
       if (!creating) {
-        setSelectedCat(prev => prev ? { ...prev, ...editForm, listing_count: prev.listing_count } : null);
+        setSelectedCat(prev => prev ? { ...prev, ...editForm, listing_count: prev.listing_count, parent_id: editForm.parentId || null } : null);
       }
       closePanel();
     } catch (err: any) {
@@ -153,15 +198,116 @@ export default function AdminCategories() {
     }));
   };
 
-  const filtered = categories.filter(c =>
-    !search || c.name.toLowerCase().includes(search.toLowerCase()) ||
-    c.slug.toLowerCase().includes(search.toLowerCase())
-  );
+  // Build eligible parents (exclude self + descendants to prevent circular refs)
+  const eligibleParents = useMemo(() => {
+    const excludeIds = new Set<string>();
+    if (!creating && selectedCat) {
+      excludeIds.add(selectedCat.id);
+      getDescendantIds(selectedCat.id).forEach(id => excludeIds.add(id));
+    }
+    return categories.filter(c => !excludeIds.has(c.id));
+  }, [categories, creating, selectedCat, getDescendantIds]);
+
+  // Recursively render a category row with indentation
+  const renderCategoryRow = (cat: Category, depth: number = 0) => {
+    const children = getChildren(cat.id);
+    const isSelected = selectedCat?.id === cat.id;
+    const matchesSearch = !search ||
+      cat.name.toLowerCase().includes(search.toLowerCase()) ||
+      cat.slug.toLowerCase().includes(search.toLowerCase());
+
+    // If search is active, show all matching categories flat
+    if (search && !matchesSearch) {
+      return children.length > 0
+        ? children.flatMap(c => renderCategoryRow(c, depth + 1))
+        : null;
+    }
+
+    const indent = search ? 0 : depth * 20;
+
+    return (
+      <Fragment key={cat.id}>
+        <tr
+          onClick={() => openEdit(cat)}
+          className="cursor-pointer group transition-colors"
+          style={{
+            borderBottom: '1px solid rgba(200,160,60,0.08)',
+            background: isSelected ? 'rgba(200,160,60,0.08)' : 'transparent',
+            borderLeft: isSelected ? '2px solid rgba(200,160,60,0.55)' : '2px solid transparent',
+          }}
+          onMouseEnter={e => { if (!isSelected) (e.currentTarget as HTMLElement).style.background = 'rgba(200,160,60,0.05)'; }}
+          onMouseLeave={e => { if (!isSelected) (e.currentTarget as HTMLElement).style.background = 'transparent'; }}>
+          <td className="px-5 py-3.5">
+            <div className="flex items-center gap-3" style={{ paddingLeft: indent }}>
+              <div className="w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0" style={{ background: 'rgba(200,160,60,0.12)' }}>
+                {depth > 0 && !search ? (
+                  <ChevronRight className="w-3.5 h-3.5" style={{ color: '#C8B090' }} />
+                ) : (
+                  <Tag className="w-4 h-4" style={{ color: '#C68000' }} />
+                )}
+              </div>
+              <div>
+                <p className="font-medium text-xs" style={{ color: '#4A3010' }}>{cat.name}</p>
+                <p className="text-[11px]" style={{ color: '#B8A070' }}>
+                  {cat.listing_count || 0} listing{cat.listing_count !== 1 ? 's' : ''}
+                  {cat.parent_id && !search ? ` · ${getParentPath(cat.parent_id)}` : ''}
+                </p>
+              </div>
+            </div>
+          </td>
+          <td className="px-4 py-3.5">
+            <code className="text-[11px] px-1.5 py-0.5 rounded" style={{ background: 'rgba(200,160,60,0.08)', color: '#9A7C40' }}>{cat.slug}</code>
+          </td>
+          <td className="px-4 py-3.5 hidden sm:table-cell">
+            <span className="text-xs" style={{ color: '#7A5C30' }}>{cat.listing_count || 0}</span>
+          </td>
+          <td className="px-4 py-3.5 hidden md:table-cell">
+            <div className="flex items-center gap-2">
+              <div className="w-5 h-5 rounded border" style={{ background: cat.color?.replace('text-', 'bg-').replace('-600', '-200') || 'bg-gray-100', borderColor: 'rgba(200,160,60,0.20)' }} />
+              <span className="text-xs" style={{ color: '#4A3010' }}>{cat.color || 'text-gray-600'}</span>
+            </div>
+          </td>
+          <td className="px-4 py-3.5 text-right">
+            <button onClick={e => { e.stopPropagation(); openEdit(cat); }}
+              className="p-1.5 rounded-lg transition-colors" style={{ color: '#B8A070' }}
+              onMouseEnter={e => (e.currentTarget as HTMLElement).style.background = 'rgba(200,160,60,0.10)'}
+              onMouseLeave={e => (e.currentTarget as HTMLElement).style.background = 'transparent'}>
+              <Edit2 className="w-3.5 h-3.5" />
+            </button>
+          </td>
+        </tr>
+        {!search && children.map(child => renderCategoryRow(child, depth + 1))}
+      </Fragment>
+    );
+  };
+
+  // Render a hierarchical option for the parent selector
+  const renderParentOption = (cat: Category, depth: number = 0): React.ReactNode => {
+    const children = getChildren(cat.id);
+    return (
+      <Fragment key={cat.id}>
+        <option value={cat.id}>
+          {'\u00A0'.repeat(depth * 3)}{depth > 0 ? '└ ' : ''}{cat.name}
+        </option>
+        {children.map(child => renderParentOption(child, depth + 1))}
+      </Fragment>
+    );
+  };
+
+  const filtered = search
+    ? categories.filter(c =>
+        c.name.toLowerCase().includes(search.toLowerCase()) ||
+        c.slug.toLowerCase().includes(search.toLowerCase())
+      )
+    : categories;
+
+  const hasChildren = (catId: string) => categories.some(c => c.parent_id === catId);
 
   const stats = {
     total: categories.length,
+    root: rootCategories.length,
+    sub: categories.length - rootCategories.length,
     used: categories.filter(c => c.listing_count > 0).length,
-    unused: categories.filter(c => c.listing_count === 0).length,
     totalListings: categories.reduce((sum, c) => sum + (c.listing_count || 0), 0),
   };
 
@@ -177,7 +323,7 @@ export default function AdminCategories() {
       <div className="flex items-center justify-between mb-6">
         <div>
           <h1 className="font-heading text-2xl font-bold" style={{ color: '#2A1A00' }}>Categories</h1>
-          <p className="text-sm mt-1" style={{ color: '#9A7C40' }}>{stats.total} categories · {stats.totalListings} total listings</p>
+          <p className="text-sm mt-1" style={{ color: '#9A7C40' }}>{stats.root} top-level · {stats.sub} subcategories · {stats.totalListings} total listings</p>
         </div>
         <div className="flex items-center gap-2">
           <button onClick={handleRefresh} disabled={refreshing}
@@ -199,12 +345,13 @@ export default function AdminCategories() {
         {/* Main Table Panel */}
         <div className={cn('flex-1 min-w-0 transition-all', (selectedCat || creating) ? 'lg:max-w-[calc(100%-420px)]' : '')}>
           {/* Stats */}
-          <div className="grid grid-cols-4 gap-3 mb-6">
+          <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 mb-6">
             {[
-              { label: 'Total Categories', value: stats.total, highlight: false },
-              { label: 'With Listings',    value: stats.used,  highlight: false },
-              { label: 'Unused',           value: stats.unused, highlight: stats.unused > 5 },
-              { label: 'Listings Categorized', value: stats.totalListings, highlight: false },
+              { label: 'Total', value: stats.total, highlight: false },
+              { label: 'Top-Level', value: stats.root, highlight: false },
+              { label: 'Subcategories', value: stats.sub, highlight: false },
+              { label: 'With Listings', value: stats.used, highlight: false },
+              { label: 'Listings', value: stats.totalListings, highlight: false },
             ].map(s => (
               <div key={s.label} className="rounded-xl p-4"
                 style={{ background: 'rgba(200,160,60,0.06)', border: s.highlight ? '1px solid rgba(239,68,68,0.25)' : '1px solid rgba(200,160,60,0.12)' }}>
@@ -250,53 +397,10 @@ export default function AdminCategories() {
                     </tr>
                   </thead>
                   <tbody>
-                    {filtered.map(cat => {
-                      const isSelected = selectedCat?.id === cat.id;
-                      return (
-                        <tr key={cat.id}
-                          onClick={() => openEdit(cat)}
-                          className="cursor-pointer group transition-colors"
-                          style={{
-                            borderBottom: '1px solid rgba(200,160,60,0.08)',
-                            background: isSelected ? 'rgba(200,160,60,0.08)' : 'transparent',
-                            borderLeft: isSelected ? '2px solid rgba(200,160,60,0.55)' : '2px solid transparent',
-                          }}
-                          onMouseEnter={e => { if (!isSelected) (e.currentTarget as HTMLElement).style.background = 'rgba(200,160,60,0.05)'; }}
-                          onMouseLeave={e => { if (!isSelected) (e.currentTarget as HTMLElement).style.background = 'transparent'; }}>
-                          <td className="px-5 py-3.5">
-                            <div className="flex items-center gap-3">
-                              <div className="w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0" style={{ background: 'rgba(200,160,60,0.12)' }}>
-                                <Tag className="w-4 h-4" style={{ color: '#C68000' }} />
-                              </div>
-                              <div>
-                                <p className="font-medium text-xs" style={{ color: '#4A3010' }}>{cat.name}</p>
-                                <p className="text-[11px]" style={{ color: '#B8A070' }}>{cat.listing_count || 0} listing{cat.listing_count !== 1 ? 's' : ''}</p>
-                              </div>
-                            </div>
-                          </td>
-                          <td className="px-4 py-3.5">
-                            <code className="text-[11px] px-1.5 py-0.5 rounded" style={{ background: 'rgba(200,160,60,0.08)', color: '#9A7C40' }}>{cat.slug}</code>
-                          </td>
-                          <td className="px-4 py-3.5 hidden sm:table-cell">
-                            <span className="text-xs" style={{ color: '#7A5C30' }}>{cat.listing_count || 0}</span>
-                          </td>
-                          <td className="px-4 py-3.5 hidden md:table-cell">
-                            <div className="flex items-center gap-2">
-                              <div className="w-5 h-5 rounded border" style={{ background: cat.color?.replace('text-', 'bg-').replace('-600', '-200') || 'bg-gray-100', borderColor: 'rgba(200,160,60,0.20)' }} />
-                              <span className="text-xs" style={{ color: '#4A3010' }}>{cat.color || 'text-gray-600'}</span>
-                            </div>
-                          </td>
-                          <td className="px-4 py-3.5 text-right">
-                            <button onClick={e => { e.stopPropagation(); openEdit(cat); }}
-                              className="p-1.5 rounded-lg transition-colors" style={{ color: '#B8A070' }}
-                              onMouseEnter={e => (e.currentTarget as HTMLElement).style.background = 'rgba(200,160,60,0.10)'}
-                              onMouseLeave={e => (e.currentTarget as HTMLElement).style.background = 'transparent'}>
-                              <Edit2 className="w-3.5 h-3.5" />
-                            </button>
-                          </td>
-                        </tr>
-                      );
-                    })}
+                    {search
+                      ? filtered.map(cat => renderCategoryRow(cat, 0))
+                      : rootCategories.map(cat => renderCategoryRow(cat, 0))
+                    }
                   </tbody>
                 </table>
               </div>
@@ -329,8 +433,8 @@ export default function AdminCategories() {
                 <div className="grid grid-cols-3" style={{ borderBottom: '1px solid rgba(200,160,60,0.10)' }}>
                   {[
                     { label: 'Listings', value: selectedCat.listing_count || 0 },
-                    { label: 'Slug',     value: selectedCat.slug || '—' },
-                    { label: 'Icon',     value: selectedCat.icon || 'Tag' },
+                    { label: 'Slug', value: selectedCat.slug || '—' },
+                    { label: 'Icon', value: selectedCat.icon || 'Tag' },
                   ].map(s => (
                     <div key={s.label} className="px-4 py-3 text-center" style={{ borderRight: '1px solid rgba(200,160,60,0.10)' }}>
                       <p className="font-bold text-sm" style={{ color: '#2A1A00' }}>{s.value}</p>
@@ -341,6 +445,21 @@ export default function AdminCategories() {
               )}
 
               <div className="p-5 space-y-4 max-h-[calc(100vh-200px)] overflow-y-auto">
+                {/* Parent Category */}
+                <div>
+                  <label className="block text-xs font-medium mb-1.5" style={{ color: '#9A7C40' }}>Parent Category</label>
+                  <div className="relative">
+                    <ChevronDown className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5" style={{ color: '#B8A070' }} />
+                    <select value={editForm.parentId} onChange={e => setEditForm(f => ({ ...f, parentId: e.target.value }))}
+                      className="w-full pl-9 pr-3 py-2.5 text-sm rounded-xl focus:outline-none transition-all appearance-none"
+                      style={{ background: 'rgba(200,160,60,0.10)', border: '1px solid rgba(200,160,60,0.15)', color: '#4A3010' }}>
+                      <option value="">— Top-Level Category —</option>
+                      {rootCategories.map(cat => renderParentOption(cat, 0))}
+                    </select>
+                  </div>
+                  <p className="text-[10px] mt-1" style={{ color: '#C8B090' }}>Leave empty for a top-level category</p>
+                </div>
+
                 {/* Name */}
                 <div>
                   <label className="block text-xs font-medium mb-1.5" style={{ color: '#9A7C40' }}>Name *</label>
@@ -349,7 +468,7 @@ export default function AdminCategories() {
                     <input value={editForm.name} onChange={e => handleNameChange(e.target.value)}
                       className="w-full pl-9 pr-3 py-2.5 text-sm rounded-xl focus:outline-none transition-all"
                       style={{ background: 'rgba(200,160,60,0.10)', border: '1px solid rgba(200,160,60,0.15)', color: '#4A3010' }}
-                      placeholder="e.g. Electronics" />
+                      placeholder="e.g. Helmet" />
                   </div>
                 </div>
 
@@ -442,6 +561,11 @@ export default function AdminCategories() {
                       <div className="space-y-2">
                         <p className="text-xs text-center" style={{ color: 'rgba(252,165,165,0.85)' }}>
                           Are you sure? This cannot be undone.
+                          {hasChildren(selectedCat.id) && (
+                            <span className="block mt-1" style={{ color: 'rgba(251,191,36,0.85)' }}>
+                              ⚠ This category has subcategories.
+                            </span>
+                          )}
                           {selectedCat.listing_count > 0 && (
                             <span className="block mt-1" style={{ color: 'rgba(251,191,36,0.85)' }}>
                               ⚠ This category has {selectedCat.listing_count} listing{selectedCat.listing_count !== 1 ? 's' : ''}.
@@ -475,3 +599,4 @@ export default function AdminCategories() {
     </div>
   );
 }
+

@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef, useMemo, Fragment } from 'react';
 import { Link } from 'react-router-dom';
 import {
   Search, Edit2, Trash2, Eye, RefreshCw, Package, CheckCircle,
@@ -75,7 +75,7 @@ export default function AdminListings() {
     title: '', description: '', price: '', currency: 'USD', categoryId: '', condition: 'good',
     location: '', sellerId: '', images: [] as File[], imageUrls: [] as string[],
   });
-  const [categories, setCategories] = useState<{ id: string; name: string }[]>([]);
+  const [categories, setCategories] = useState<{ id: string; name: string; parentId: string | null }[]>([]);
   const [creating, setCreating] = useState(false);
   const [uploadingCreate, setUploadingCreate] = useState(false);
   const createFileRef = useRef<HTMLInputElement>(null);
@@ -96,7 +96,7 @@ export default function AdminListings() {
   const fetchCategories = useCallback(async () => {
     try {
       const data = await categoriesClient.list();
-      setCategories((data || []).map((c: any) => ({ id: c.id, name: c.name })));
+      setCategories((data || []).map((c: any) => ({ id: c.id, name: c.name, parentId: c.parentId || null })));
     } catch {
       setCategories([]);
     }
@@ -128,6 +128,28 @@ export default function AdminListings() {
       toast.error('Failed to load listings');
     }
   }, []);
+
+  const rootCategories = useMemo(() =>
+    categories.filter(c => !c.parentId),
+    [categories]
+  );
+
+  const getChildren = useCallback((parentId: string) =>
+    categories.filter(c => c.parentId === parentId),
+    [categories]
+  );
+
+  const renderCategoryOption = (cat: { id: string; name: string; parentId: string | null }, depth: number = 0): React.ReactNode => {
+    const children = getChildren(cat.id);
+    return (
+      <Fragment key={cat.id}>
+        <option value={cat.id}>
+          {'\u00A0'.repeat(depth * 4)}{depth > 0 ? '└ ' : ''}{cat.name}
+        </option>
+        {children.map(child => renderCategoryOption(child, depth + 1))}
+      </Fragment>
+    );
+  };
 
   useEffect(() => {
     setLoading(true);
@@ -579,7 +601,7 @@ export default function AdminListings() {
                           <select value={editForm.categoryId} onChange={e => setEditForm(f => ({ ...f, categoryId: e.target.value }))}
                             className="w-full px-3 py-2.5 text-sm border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-[hsl(var(--brand-navy))] bg-white">
                             <option value="">Uncategorized</option>
-                            {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                            {rootCategories.map(c => renderCategoryOption(c, 0))}
                           </select>
                         </div>
                         <div>
@@ -759,7 +781,7 @@ export default function AdminListings() {
                     className="w-full px-3 py-2.5 text-sm border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-[hsl(var(--brand-navy))] bg-white"
                     style={{ color: '#2A1A00' }}>
                     <option value="">Uncategorized</option>
-                    {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                    {rootCategories.map(c => renderCategoryOption(c, 0))}
                   </select>
                 </div>
                 <div>
