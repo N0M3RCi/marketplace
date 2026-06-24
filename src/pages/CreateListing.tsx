@@ -1,13 +1,14 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Upload, X, Plus, ChevronRight, ChevronLeft, Image as ImageIcon,
-  Tag, DollarSign, MapPin, FileText, CheckCircle, Loader2, ShieldCheck
+  Tag, DollarSign, MapPin, FileText, CheckCircle, Loader2, ShieldCheck, User
 } from 'lucide-react';
 import Navbar from '@/components/layout/Navbar';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/hooks/useAuth';
 import { fetchCategories, createListing } from '@/lib/api';
+import { admin } from '@/lib/client';
 import { supabase } from '@/lib/supabase';
 import { useQuery } from '@tanstack/react-query';
 import { toast } from 'sonner';
@@ -45,6 +46,18 @@ export default function CreateListing() {
   const [step, setStep] = useState(0);
   const [submitting, setSubmitting] = useState(false);
   const [uploadingImages, setUploadingImages] = useState(false);
+  const [sellers, setSellers] = useState<{ id: string; username: string; email: string }[]>([]);
+  const [selectedSellerId, setSelectedSellerId] = useState<string>('');
+
+  // Admin can pick which user the listing belongs to
+  useEffect(() => {
+    if (user?.role === 'admin') {
+      admin.users.list().then((data: any[]) => {
+        const list = data.map((u: any) => ({ id: u.id, username: u.username || u.email?.split('@')[0] || 'Unknown', email: u.email }));
+        setSellers(list);
+      }).catch(() => {});
+    }
+  }, [user?.role]);
 
   const [form, setForm] = useState<FormData>({
     title: '',
@@ -139,7 +152,7 @@ export default function CreateListing() {
       price: Number(form.price),
       currency: form.currency,
       images: imagePublicUrls,
-      sellerId: user.id,
+      sellerId: selectedSellerId || user.id,
     });
 
     toast.success('Listing published successfully!');
@@ -517,6 +530,28 @@ export default function CreateListing() {
                 <p className="text-xs mb-1" style={{ color: 'rgba(255,255,255,0.38)' }}>Description Preview</p>
                 <p className="text-sm line-clamp-3 leading-relaxed" style={{ color: 'rgba(255,255,255,0.75)' }}>{form.description}</p>
               </div>
+
+              {user?.role === 'admin' && (
+                <div className="rounded-xl px-4 py-4" style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,215,60,0.25)' }}>
+                  <label className="block text-xs font-semibold mb-2 flex items-center gap-1.5" style={{ color: 'rgba(255,235,100,0.85)' }}>
+                    <User className="w-3.5 h-3.5" /> Assign This Listing To
+                  </label>
+                  <select
+                    value={selectedSellerId}
+                    onChange={e => setSelectedSellerId(e.target.value)}
+                    className="w-full px-3 py-2.5 text-sm rounded-xl focus:outline-none focus:ring-1 transition-all"
+                    style={{ background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.12)', color: 'rgba(255,255,255,0.85)' }}
+                  >
+                    <option value="">Myself (admin)</option>
+                    {sellers.filter(s => s.id !== user.id).map(s => (
+                      <option key={s.id} value={s.id}>{s.username} ({s.email})</option>
+                    ))}
+                  </select>
+                  <p className="text-xs mt-1.5" style={{ color: 'rgba(255,255,255,0.35)' }}>
+                    The selected user will appear as the seller of this listing
+                  </p>
+                </div>
+              )}
 
               <div className="flex items-start gap-2 text-xs text-muted-foreground bg-amber-50 border border-amber-200 rounded-xl p-3">
                 <FileText className="w-4 h-4 text-amber-600 flex-shrink-0 mt-0.5" />

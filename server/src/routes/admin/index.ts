@@ -137,7 +137,7 @@ router.get('/listings', async (_req: AuthRequest, res) => {
 
 router.put('/listings/:id', async (req: AuthRequest, res) => {
   try {
-    const { title, description, price, currency, condition, location, status, category_id, images } = req.body;
+    const { title, description, price, currency, condition, location, status, category_id, images, seller_id } = req.body;
     const sets: string[] = ['updated_at = NOW()'];
     const vals: any[] = [];
     let idx = 1;
@@ -150,6 +150,7 @@ router.put('/listings/:id', async (req: AuthRequest, res) => {
     if (status !== undefined) { sets.push(`status = $${idx++}`); vals.push(status); }
     if (category_id !== undefined) { sets.push(`category_id = $${idx++}`); vals.push(category_id); }
     if (images !== undefined) { sets.push(`images = $${idx++}`); vals.push(images); }
+    if (seller_id !== undefined) { sets.push(`seller_id = $${idx++}`); vals.push(seller_id); }
     if (sets.length === 1) { res.json({ ok: true }); return; }
     vals.push(req.params.id);
     await pool.query(`UPDATE listings SET ${sets.join(', ')} WHERE id = $${idx}`, vals);

@@ -76,12 +76,14 @@ router.get('/:id', async (req, res) => {
 // POST /api/listings
 router.post('/', authMiddleware, async (req: AuthRequest, res) => {
   try {
-    const { title, description, price, currency, categoryId, images, condition, location } = req.body;
+    const { title, description, price, currency, categoryId, images, condition, location, sellerId } = req.body;
     const id = uuid();
+    // Admin can attribute listings to a specific user; non-admin always use own ID
+    const effectiveSellerId = (req.userRole === 'admin' && sellerId) ? sellerId : req.userId;
     const result = await pool.query(`
       INSERT INTO listings (id, title, description, price, currency, category_id, seller_id, images, condition, location)
       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) RETURNING *`, [
-      id, title, description, price, currency || 'USD', categoryId, req.userId,
+      id, title, description, price, currency || 'USD', categoryId, effectiveSellerId,
       images || [], condition || 'good', location || ''
     ]);
     const l = result.rows[0];

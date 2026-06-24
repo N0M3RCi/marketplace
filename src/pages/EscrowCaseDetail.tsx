@@ -206,6 +206,11 @@ export default function EscrowCaseDetail() {
     setPaymentProofFile(null);
     toast.info('Payment selection cancelled');
     await fetchCase();
+    // Directly fetch available addresses so the user can pick again
+    try {
+      const addresses = await paymentAddresses.list();
+      setAvailableAddresses(addresses.filter((a: any) => a.isActive !== false));
+    } catch {}
   };
 
   const handleSelectAddress = async (addr: any) => {
@@ -582,9 +587,17 @@ export default function EscrowCaseDetail() {
                     )}
 
                     {canSubmitPayment && !showPaymentForm && (
-                      <Button onClick={() => setShowPaymentForm(true)} className="w-full navy-gradient text-white border-0 hover:opacity-90">
-                        <Send className="w-4 h-4 mr-2" /> I've Sent the Payment
-                      </Button>
+                      <div className="space-y-2">
+                        <Button onClick={() => setShowPaymentForm(true)} className="w-full navy-gradient text-white border-0 hover:opacity-90">
+                          <Send className="w-4 h-4 mr-2" /> I've Sent the Payment
+                        </Button>
+                        <button
+                          onClick={handleCancelPaymentSelection}
+                          className="w-full text-xs text-muted-foreground hover:text-foreground underline underline-offset-2 transition-colors text-center"
+                        >
+                          Choose a different address
+                        </button>
+                      </div>
                     )}
                   </div>
                 )}

@@ -39,6 +39,7 @@ interface EditForm {
   location: string;
   status: string;
   categoryId: string;
+  sellerId: string;
 }
 
 const STATUS_CONFIG: Record<string, { label: string; bg: string; color: string }> = {
@@ -258,6 +259,7 @@ export default function AdminListings() {
       location: listing.location,
       status: listing.status,
       categoryId: listing.categoryId || '',
+      sellerId: listing.sellerId || '',
     });
     setEditImages(listing.images || []);
     setEditImageFiles([]);
@@ -266,7 +268,7 @@ export default function AdminListings() {
 
   const cancelEdit = () => {
     setEditingId(null);
-    setEditForm({ title: '', description: '', price: '', condition: '', location: '', status: '', categoryId: '' });
+    setEditForm({ title: '', description: '', price: '', condition: '', location: '', status: '', categoryId: '', sellerId: '' });
     setEditImages([]);
     setEditImageFiles([]);
     setEditImagePreviews([]);
@@ -294,8 +296,11 @@ export default function AdminListings() {
       setEditUploading(false);
     }
 
+    const originalListing = listings.find(l => l.id === listingId);
+    const sellerChanged = editForm.sellerId && editForm.sellerId !== originalListing?.sellerId;
+
     try {
-      await admin.listings.update(listingId, {
+      const updateData: Record<string, any> = {
         title: editForm.title.trim(),
         description: editForm.description.trim(),
         price,
@@ -304,10 +309,18 @@ export default function AdminListings() {
         status: editForm.status,
         category_id: editForm.categoryId || null,
         images: finalImages,
-      });
+      };
+      if (editForm.sellerId) {
+        updateData.seller_id = editForm.sellerId;
+      }
 
-      await logAudit('edit_listing', 'listing', listingId,
-        `Updated listing "${editForm.title}" — price: ${formatCurrency(price)}, status: ${editForm.status}, images: ${finalImages.length}`);
+      await admin.listings.update(listingId, updateData);
+
+      const auditDetails = `Updated listing "${editForm.title}" — price: ${formatCurrency(price)}, status: ${editForm.status}, images: ${finalImages.length}`;
+      const sellerDetails = sellerChanged
+        ? `, seller reassigned to ${sellers.find(s => s.id === editForm.sellerId)?.username || editForm.sellerId}`
+        : '';
+      await logAudit('edit_listing', 'listing', listingId, auditDetails + sellerDetails);
 
       toast.success('Listing updated successfully');
       setEditingId(null);
@@ -609,6 +622,16 @@ export default function AdminListings() {
                           <select value={editForm.status} onChange={e => setEditForm(f => ({ ...f, status: e.target.value }))}
                             className="w-full px-3 py-2.5 text-sm border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-[hsl(var(--brand-navy))] bg-white">
                             {Object.entries(STATUS_CONFIG).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
+                          </select>
+                        </div>
+                        <div>
+                          <label className="block text-xs font-medium mb-1">Seller</label>
+                          <select value={editForm.sellerId} onChange={e => setEditForm(f => ({ ...f, sellerId: e.target.value }))}
+                            className="w-full px-3 py-2.5 text-sm border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-[hsl(var(--brand-navy))] bg-white">
+                            <option value="">Keep current seller</option>
+                            {sellers.map(s => (
+                              <option key={s.id} value={s.id}>{s.username} ({s.email})</option>
+                            ))}
                           </select>
                         </div>
                       </div>

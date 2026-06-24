@@ -57,9 +57,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         if (!mounted) return;
 
         const msg = err?.message || '';
-        // 401 = token expired/invalid — legit logout
-        // 404 = user deleted — legit logout
-        if (msg.includes('401') || msg.includes('404') || msg.includes('No token')) {
+        // [401] = token expired/invalid — legit logout
+        // [404] = user deleted — legit logout
+        if (msg.includes('[401]') || msg.includes('[404]') || msg.includes('No token')) {
           localStorage.removeItem('auth_token');
           setUser(null);
           setLoading(false);
@@ -109,7 +109,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setLoading(false);
     } catch {
       // Silent — don't log out on transient errors
-      setUser(null);
       setLoading(false);
     }
   }, []);
