@@ -3,7 +3,7 @@ import { useParams, useNavigate, Link } from 'react-router-dom';
 import {
   ArrowLeft, Shield, User, CreditCard, Package, Truck, CheckCircle,
   AlertTriangle, Clock, ExternalLink, Copy, Upload, X, Loader2,
-  Bitcoin, Camera, Video, FileText, ChevronRight, Send, Image as ImageIcon
+  Bitcoin, Camera, Video, FileText, ChevronRight, Send, Image as ImageIcon, Trash2
 } from 'lucide-react';
 import Navbar from '@/components/layout/Navbar';
 import { Button } from '@/components/ui/button';
@@ -105,6 +105,8 @@ export default function EscrowCaseDetail() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const [deletingCase, setDeletingCase] = useState(false);
 
   // Payment submission form
   const [paymentForm, setPaymentForm] = useState({ txHash: '', amountSent: '', method: 'crypto' });
@@ -414,6 +416,20 @@ export default function EscrowCaseDetail() {
     setSaving(false);
   };
 
+  const handleDeleteCase = async () => {
+    if (!id || !user) return;
+    setDeletingCase(true);
+    try {
+      await escrow.delete(id);
+      toast.success('Escrow case deleted');
+      navigate('/dashboard');
+    } catch (err: any) {
+      toast.error(err?.message || 'Failed to delete escrow case');
+      setDeletingCase(false);
+      setConfirmDelete(false);
+    }
+  };
+
   if (loading) return (
     <div className="min-h-screen" style={{ background: '#000000' }}>
       <Navbar />
@@ -618,6 +634,12 @@ export default function EscrowCaseDetail() {
                           className="w-full text-xs text-muted-foreground hover:text-foreground underline underline-offset-2 transition-colors text-center"
                         >
                           Choose a different address
+                        </button>
+                        <button
+                          onClick={() => setConfirmDelete(true)}
+                          className="w-full text-xs text-red-500 hover:text-red-600 underline underline-offset-2 transition-colors text-center"
+                        >
+                          Delete this escrow case
                         </button>
                       </div>
                     )}
@@ -1021,6 +1043,45 @@ export default function EscrowCaseDetail() {
           </div>
         </div>
       </div>
+    {/* Delete Confirmation Modal */}
+      {confirmDelete && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: 'rgba(0,0,0,0.75)', backdropFilter: 'blur(8px)' }}>
+          <div className="w-full max-w-sm rounded-2xl overflow-hidden" style={{ background: '#0c0c0c', border: '1px solid rgba(239,68,68,0.20)', boxShadow: '0 32px 100px rgba(0,0,0,0.90)' }}>
+            <div className="flex items-center justify-between px-6 py-4" style={{ borderBottom: '1px solid rgba(255,255,255,0.07)' }}>
+              <div className="flex items-center gap-2.5">
+                <AlertTriangle className="w-5 h-5" style={{ color: 'rgba(239,68,68,0.85)' }} />
+                <h2 className="font-heading font-bold" style={{ color: 'rgba(255,255,255,0.92)' }}>Delete Escrow Case</h2>
+              </div>
+              <button onClick={() => setConfirmDelete(false)} className="p-1.5 rounded-lg" style={{ color: 'rgba(255,255,255,0.45)' }}>
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            <div className="p-6 space-y-4">
+              <p className="text-sm leading-relaxed" style={{ color: 'rgba(255,255,255,0.65)' }}>
+                Are you sure you want to permanently delete this escrow case? This action <strong style={{ color: 'rgba(239,68,68,0.85)' }}>cannot be undone</strong>.
+              </p>
+              <div className="flex gap-3">
+                <button
+                  onClick={handleDeleteCase}
+                  disabled={deletingCase}
+                  className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-semibold transition-all"
+                  style={{ background: 'rgba(239,68,68,0.20)', border: '1px solid rgba(239,68,68,0.40)', color: 'rgba(248,113,113,0.95)' }}
+                  onMouseEnter={e => (e.currentTarget as HTMLButtonElement).style.background = 'rgba(239,68,68,0.30)'}
+                  onMouseLeave={e => (e.currentTarget as HTMLButtonElement).style.background = 'rgba(239,68,68,0.20)'}
+                >
+                  {deletingCase ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
+                  {deletingCase ? 'Deleting...' : 'Yes, Delete'}
+                </button>
+                <button onClick={() => setConfirmDelete(false)}
+                  className="px-4 py-2.5 rounded-xl text-sm transition-all"
+                  style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.10)', color: 'rgba(255,255,255,0.60)' }}>
+                  Cancel
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

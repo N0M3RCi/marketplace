@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import {
   ShieldCheck, Package, Clock, DollarSign, MessageSquare, ChevronRight,
-  Plus, TrendingUp, Bell, BellOff, Loader2, RefreshCw, AlertTriangle, Store, CheckCircle, X
+  Plus, TrendingUp, Bell, BellOff, Loader2, RefreshCw, AlertTriangle, Store, CheckCircle, X, Trash2
 } from 'lucide-react';
 import Navbar from '@/components/layout/Navbar';
 import { Button } from '@/components/ui/button';
@@ -51,6 +51,8 @@ export default function Dashboard() {
   const [showSellerRequestModal, setShowSellerRequestModal] = useState(false);
   const [sellerRequestReason, setSellerRequestReason] = useState('');
   const [submittingRequest, setSubmittingRequest] = useState(false);
+  const [confirmDeleteCase, setConfirmDeleteCase] = useState<string | null>(null);
+  const [deletingCase, setDeletingCase] = useState(false);
 
   const fetchCases = useCallback(async () => {
     try {
@@ -119,6 +121,19 @@ export default function Dashboard() {
       setSellerRequestReason('');
     } catch { toast.error('Failed to submit request'); }
     setSubmittingRequest(false);
+  };
+
+  const handleDeleteCase = async (caseId: string) => {
+    setDeletingCase(true);
+    try {
+      await escrowApi.delete(caseId);
+      setCases(prev => prev.filter(c => c.id !== caseId));
+      toast.success('Escrow case deleted');
+    } catch (err: any) {
+      toast.error(err?.message || 'Failed to delete escrow case');
+    }
+    setDeletingCase(false);
+    setConfirmDeleteCase(null);
   };
 
   const handleRefresh = async () => {
@@ -299,6 +314,18 @@ export default function Dashboard() {
                             </p>
                           </div>
                           <ChevronRight className="w-4 h-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity mt-1 flex-shrink-0" />
+                        {isBuying && escrowCase.status === 'awaiting_payment' && (
+                          <button
+                            onClick={e => { e.preventDefault(); e.stopPropagation(); setConfirmDeleteCase(escrowCase.id); }}
+                            className="p-1.5 rounded-lg transition-colors flex-shrink-0 mt-1"
+                            style={{ color: 'rgba(239,68,68,0.5)' }}
+                            onMouseEnter={e => (e.currentTarget as HTMLElement).style.color = 'rgba(239,68,68,0.9)'}
+                            onMouseLeave={e => (e.currentTarget as HTMLElement).style.color = 'rgba(239,68,68,0.5)'}
+                            title="Delete this escrow case"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        )}
                         </div>
 
                         {/* Progress bar for active cases */}
@@ -524,6 +551,49 @@ export default function Dashboard() {
           </div>
         </div>
       </div>
+
+      {/* Delete Escrow Confirmation Modal */}
+      {confirmDeleteCase && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: 'rgba(0,0,0,0.75)', backdropFilter: 'blur(8px)' }}>
+          <div className="w-full max-w-sm rounded-2xl overflow-hidden" style={{ background: '#0c0c0c', border: '1px solid rgba(239,68,68,0.20)', boxShadow: '0 32px 100px rgba(0,0,0,0.90)' }}>
+            <div className="flex items-center justify-between px-6 py-4" style={{ borderBottom: '1px solid rgba(255,255,255,0.07)' }}>
+              <div className="flex items-center gap-2.5">
+                <AlertTriangle className="w-5 h-5" style={{ color: 'rgba(239,68,68,0.85)' }} />
+                <h2 className="font-heading font-bold" style={{ color: 'rgba(255,255,255,0.92)' }}>Delete Escrow Case</h2>
+              </div>
+              <button onClick={() => setConfirmDeleteCase(null)} className="p-1.5 rounded-lg" style={{ color: 'rgba(255,255,255,0.45)' }}>
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            <div className="p-6 space-y-4">
+              <p className="text-sm leading-relaxed" style={{ color: 'rgba(255,255,255,0.65)' }}>
+                Are you sure you want to permanently delete this escrow case? This action <strong style={{ color: 'rgba(239,68,68,0.85)' }}>cannot be undone</strong>.
+              </p>
+              <p className="text-xs" style={{ color: 'rgba(255,255,255,0.40)' }}>
+                Only available when no payment has been submitted yet.
+              </p>
+              <div className="flex gap-3">
+                <button
+                  onClick={() => handleDeleteCase(confirmDeleteCase)}
+                  disabled={deletingCase}
+                  className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-semibold transition-all"
+                  style={{ background: 'rgba(239,68,68,0.20)', border: '1px solid rgba(239,68,68,0.40)', color: 'rgba(248,113,113,0.95)' }}
+                  onMouseEnter={e => (e.currentTarget as HTMLButtonElement).style.background = 'rgba(239,68,68,0.30)'}
+                  onMouseLeave={e => (e.currentTarget as HTMLButtonElement).style.background = 'rgba(239,68,68,0.20)'}
+                >
+                  {deletingCase ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
+                  {deletingCase ? 'Deleting...' : 'Yes, Delete'}
+                </button>
+                <button onClick={() => setConfirmDeleteCase(null)}
+                  className="px-4 py-2.5 rounded-xl text-sm transition-all"
+                  style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.10)', color: 'rgba(255,255,255,0.60)' }}>
+                  Cancel
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

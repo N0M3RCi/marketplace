@@ -141,4 +141,43 @@ router.post('/timeline', async (req: AuthRequest, res) => {
   }
 });
 
+// DELETE /api/escrow/:id — buyer can cancel/delete before submitting payment
+router.delete('/:id', async (req: AuthRequest, res) => {
+  try {
+    const caseId = req.params.id;
+    const userId = req.userId;
+    if (!userId) { res.status(401).json({ error: 'Authentication required' }); return; }
+
+    // Fetch the case
+    const caseResult = await pool.query('SELECT * FROM escrow_cases WHERE id = $1::uuid', [caseId]);
+    if (caseResult.rows.length === 0) { res.status(404).json({ error: 'Case not found' }); return; }
+    const escrowCase = caseResult.rows[0];
+
+    // Only the buyer can delete
+    if (escrowCase.buyer_id !== userId) {
+      res.status(403).json({ error: 'Only the buyer can delete this escrow case' });
+      return;
+    }
+
+    // Only allowed when awaiting_payment and payment not yet submitted
+    if (escrowCase.status !== 'awaiting_payment') {
+      res.status(403).json({ error: 'Can only cancel cases in awaiting_payment status' });
+      return;
+    }
+    if (escrowCase.payment_submitted_at) {
+      res.status(403).json({ error: 'Cannot delete after payment has been submitted' });
+      return;
+    }
+
+    // Cascade delete related data
+    await pool.query('DELETE FROM escrow_timeline WHERE case_id = $1::uuid', [caseId]);
+    await pool.query('DELETE FROM notifications WHERE case_id = $1::uuid', [caseId]);
+    await pool.query('DELETE FROM escrow_cases WHERE id = $1::uuid', [caseId]);
+
+    res.json({ ok: true });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 export default router;

@@ -93,6 +93,8 @@ export const escrow = {
   timeline: (caseId: string) => request(`/api/escrow/${caseId}/timeline`),
   addTimeline: (data: any) =>
     request('/api/escrow/timeline', { method: 'POST', body: JSON.stringify(data) }),
+  delete: (id: string) =>
+    request(`/api/escrow/${id}`, { method: 'DELETE' }),
 };
 
 // Wallet
