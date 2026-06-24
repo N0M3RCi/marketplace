@@ -169,9 +169,9 @@ router.delete('/:id', async (req: AuthRequest, res) => {
       return;
     }
 
-    // Cascade delete related data
-    await pool.query('DELETE FROM escrow_timeline WHERE case_id = $1::uuid', [caseId]);
-    await pool.query('DELETE FROM notifications WHERE case_id = $1::uuid', [caseId]);
+    // Cascade delete related data (timeline/notifications case_id is text, escrow_cases.id is uuid)
+    await pool.query('DELETE FROM escrow_timeline WHERE case_id = $1', [caseId]);
+    await pool.query('DELETE FROM notifications WHERE case_id = $1', [caseId]);
     await pool.query('DELETE FROM escrow_cases WHERE id = $1::uuid', [caseId]);
 
     res.json({ ok: true });
