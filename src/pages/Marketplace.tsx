@@ -4,7 +4,6 @@ import { Search, SlidersHorizontal } from 'lucide-react';
 import Navbar from '@/components/layout/Navbar';
 import ListingCard from '@/components/features/ListingCard';
 import { Button } from '@/components/ui/button';
-import { MOCK_LISTINGS, MOCK_CATEGORIES } from '@/lib/mockData';
 import { fetchListings, fetchCategories } from '@/lib/api';
 import type { Listing, Category } from '@/types';
 
@@ -24,9 +23,9 @@ export default function Marketplace() {
   const [priceMin, setPriceMin] = useState('');
   const [priceMax, setPriceMax] = useState('');
   const [showFilters, setShowFilters] = useState(false);
-  const [listings, setListings] = useState<Listing[]>(MOCK_LISTINGS.filter(l => l.status === 'active'));
-  const [categories, setCategories] = useState<Category[]>(MOCK_CATEGORIES);
-  const [listingsLoading, setListingsLoading] = useState(false);
+  const [listings, setListings] = useState<Listing[]>([]);
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [listingsLoading, setListingsLoading] = useState(true);
 
   // Load categories from backend
   useEffect(() => {
@@ -46,6 +45,10 @@ export default function Marketplace() {
             cat.id,
             ...categories.filter(c => c.parentId === cat.id).map(c => c.id),
           ];
+        } else {
+          // Category slug not found yet (categories haven't loaded) — skip this fetch
+          setListingsLoading(false);
+          return;
         }
       }
       fetchListings({
@@ -55,10 +58,9 @@ export default function Marketplace() {
         maxPrice: priceMax ? Number(priceMax) : undefined,
         sort: sortBy,
       }).then(data => {
-        // Prefer real DB listings; fallback to mock only if DB completely fails
         setListings(data);
       }).catch(() => {
-        setListings(MOCK_LISTINGS.filter(l => l.status === 'active'));
+        setListings([]);
       }).finally(() => setListingsLoading(false));
     }, 300);
     return () => clearTimeout(timer);
