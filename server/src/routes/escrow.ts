@@ -148,8 +148,8 @@ router.delete('/:id', async (req: AuthRequest, res) => {
     const userId = req.userId;
     if (!userId) { res.status(401).json({ error: 'Authentication required' }); return; }
 
-    // Fetch the case
-    const caseResult = await pool.query('SELECT * FROM escrow_cases WHERE id = $1::uuid', [caseId]);
+    // Fetch the case (escrow_cases.id is text, eg. ESC-xxx)
+    const caseResult = await pool.query('SELECT * FROM escrow_cases WHERE id = $1', [caseId]);
     if (caseResult.rows.length === 0) { res.status(404).json({ error: 'Case not found' }); return; }
     const escrowCase = caseResult.rows[0];
 
@@ -169,10 +169,10 @@ router.delete('/:id', async (req: AuthRequest, res) => {
       return;
     }
 
-    // Cascade delete related data (timeline/notifications case_id is text, escrow_cases.id is uuid)
+    // Cascade delete related data
     await pool.query('DELETE FROM escrow_timeline WHERE case_id = $1', [caseId]);
     await pool.query('DELETE FROM notifications WHERE case_id = $1', [caseId]);
-    await pool.query('DELETE FROM escrow_cases WHERE id = $1::uuid', [caseId]);
+    await pool.query('DELETE FROM escrow_cases WHERE id = $1', [caseId]);
 
     res.json({ ok: true });
   } catch (err: any) {
