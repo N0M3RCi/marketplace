@@ -149,6 +149,8 @@ export const admin = {
       request(`/api/admin/users/${id}/status`, { method: 'PUT', body: JSON.stringify({ status, is_active: isActive }) }),
     toggleVerify: (id: string) =>
       request(`/api/admin/users/${id}/verify`, { method: 'PUT' }),
+    delete: (id: string) =>
+      request(`/api/admin/users/${id}`, { method: 'DELETE' }),
   },
   listings: {
     list: () => request('/api/admin/listings'),

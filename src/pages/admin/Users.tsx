@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import {
   Search, Shield, CheckCircle, XCircle, Filter, Loader2,
   RefreshCw, Edit2, X, Save, User, Mail, Phone, Star,
-  ShieldCheck, ChevronRight, Hash, Plus,
+  ShieldCheck, ChevronRight, Hash, Plus, Trash2,
   Ban, AlertTriangle, Crown, Store
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -79,6 +79,8 @@ export default function AdminUsers() {
 const [showCreateModal, setShowCreateModal] = useState(false);
 const [createForm, setCreateForm] = useState({ username: '', email: '', password: '', role: 'seller' });
 const [creating, setCreating] = useState(false);
+const [deleting, setDeleting] = useState(false);
+const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
 
   const fetchUsers = useCallback(async () => {
     const { data, error } = await supabase
@@ -287,6 +289,20 @@ const [creating, setCreating] = useState(false);
       toast.error(err?.message || 'Failed to create user');
     }
     setCreating(false);
+  };
+
+  const handleDelete = async (userId: string) => {
+    setDeleting(true);
+    try {
+      await admin.users.delete(userId);
+      toast.success('User deleted permanently');
+      setConfirmDelete(null);
+      closePanel();
+      await fetchUsers();
+    } catch (err: any) {
+      toast.error(err?.message || 'Failed to delete user');
+    }
+    setDeleting(false);
   };
 
   const filtered = users.filter(u => {
@@ -595,6 +611,12 @@ const [creating, setCreating] = useState(false);
                                   onMouseLeave={e => (e.currentTarget as HTMLElement).style.background = 'transparent'}>
                                   <Edit2 className="w-3.5 h-3.5" />
                                 </button>
+                                <button onClick={e => { e.stopPropagation(); openEditPanel(u); setConfirmDelete(u.id); }}
+                                  className="p-1.5 rounded-lg transition-colors" style={{ color: '#B8A070' }}
+                                  onMouseEnter={e => (e.currentTarget as HTMLElement).style.background = 'rgba(239,68,68,0.10)'}
+                                  onMouseLeave={e => (e.currentTarget as HTMLElement).style.background = 'transparent'}>
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                </button>
                               </div>
                             </td>
                           </tr>
@@ -780,10 +802,69 @@ const [creating, setCreating] = useState(false);
                     </button>
                   </div>
                   <p className="text-[10px] text-center" style={{ color: '#C8B090' }}>All changes are logged in the audit trail</p>
+
+                  {/* Danger Zone */}
+                  <div className="pt-2 border-t" style={{ borderColor: 'rgba(239,68,68,0.15)' }}>
+                    {confirmDelete === selectedUser.id ? (
+                      <div className="p-3 rounded-xl" style={{ background: 'rgba(239,68,68,0.10)', border: '1px solid rgba(239,68,68,0.25)' }}>
+                        <p className="text-xs font-semibold" style={{ color: 'rgba(252,165,165,0.90)' }}>Delete this user permanently?</p>
+                        <p className="text-[11px] mt-1" style={{ color: 'rgba(252,165,165,0.65)' }}>This cannot be undone. The user must have no active escrow cases or listings.</p>
+                        <div className="flex gap-2 mt-3">
+                          <button onClick={() => handleDelete(selectedUser.id)} disabled={deleting}
+                            className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-xs font-semibold transition-all"
+                            style={{ background: 'rgba(239,68,68,0.20)', border: '1px solid rgba(239,68,68,0.35)', color: 'rgba(252,165,165,0.90)' }}>
+                            {deleting ? <Loader2 className="w-3 h-3 animate-spin" /> : <Trash2 className="w-3 h-3" />}
+                            {deleting ? 'Deleting...' : 'Yes, Delete'}
+                          </button>
+                          <button onClick={() => setConfirmDelete(null)}
+                            className="px-4 py-2 rounded-lg text-xs transition-all"
+                            style={{ background: 'rgba(200,160,60,0.10)', border: '1px solid rgba(200,160,60,0.15)', color: '#8A6C40' }}>
+                            Cancel
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <button onClick={() => setConfirmDelete(selectedUser.id)}
+                        className="w-full flex items-center justify-center gap-1.5 py-2.5 rounded-xl text-xs font-semibold transition-all"
+                        style={{ background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.20)', color: 'rgba(252,165,165,0.85)' }}
+                        onMouseEnter={e => (e.currentTarget as HTMLButtonElement).style.background = 'rgba(239,68,68,0.15)'}
+                        onMouseLeave={e => (e.currentTarget as HTMLButtonElement).style.background = 'rgba(239,68,68,0.08)'}>
+                        <Trash2 className="w-3.5 h-3.5" /> Delete User
+                      </button>
+                    )}
+                  </div>
                 </div>
               </div>
             </div>
           )}
+        {/* Delete Confirmation Modal */}
+      {confirmDelete && !selectedUser && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ backdropFilter: 'blur(8px)', background: 'rgba(0,0,0,0.50)' }}>
+          <div className="w-full max-w-sm rounded-2xl overflow-hidden bg-white shadow-2xl border border-border">
+            <div className="px-6 py-4 border-b border-border" style={{ background: '#FFFDF5' }}>
+              <h2 className="font-heading font-bold" style={{ color: '#2A1A00' }}>Delete User</h2>
+              <p className="text-xs mt-0.5" style={{ color: '#9A7C40' }}>This cannot be undone.</p>
+            </div>
+            <div className="p-6 space-y-4">
+              <p className="text-sm" style={{ color: '#6B5D3D' }}>Are you sure you want to permanently delete this user? They must have no active escrow cases or listings.</p>
+              <div className="flex gap-3">
+                <button onClick={() => handleDelete(confirmDelete)} disabled={deleting}
+                  className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-semibold transition-all"
+                  style={{ background: 'rgba(239,68,68,0.20)', border: '1px solid rgba(239,68,68,0.35)', color: 'rgba(252,165,165,0.90)' }}>
+                  {deleting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
+                  {deleting ? 'Deleting...' : 'Delete'}
+                </button>
+                <button onClick={() => setConfirmDelete(null)}
+                  className="px-5 py-2.5 rounded-xl text-sm transition-all border"
+                  style={{ background: 'white', border: '1px solid rgba(200,160,60,0.25)', color: '#6B5D3D' }}>
+                  Cancel
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
         {/* Create User Modal */}
       {showCreateModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ backdropFilter: 'blur(8px)', background: 'rgba(0,0,0,0.50)' }}>

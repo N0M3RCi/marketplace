@@ -99,6 +99,53 @@ router.post('/users', async (req: AuthRequest, res) => {
   } catch (err: any) { res.status(500).json({ error: err.message }); }
 });
 
+router.delete('/users/:id', async (req: AuthRequest, res) => {
+  try {
+    const { id } = req.params;
+
+    // Check if user has active escrow cases
+    const escrowCheck = await pool.query(
+      'SELECT COUNT(*) FROM escrow_cases WHERE buyer_id = $1 OR seller_id = $1',
+      [id]
+    );
+    if (parseInt(escrowCheck.rows[0].count) > 0) {
+      res.status(400).json({
+        error: `Cannot delete user — they have ${escrowCheck.rows[0].count} escrow case(s). Close or reassign them first.`
+      });
+      return;
+    }
+
+    // Check if user has listings
+    const listingCheck = await pool.query('SELECT COUNT(*) FROM listings WHERE seller_id = $1', [id]);
+    if (parseInt(listingCheck.rows[0].count) > 0) {
+      res.status(400).json({
+        error: `Cannot delete user — they have ${listingCheck.rows[0].count} listing(s). Delete or reassign them first.`
+      });
+      return;
+    }
+
+    // Cascade delete related data
+    await pool.query('DELETE FROM wallet_transactions WHERE wallet_id IN (SELECT id FROM wallets WHERE user_id = $1)', [id]);
+    await pool.query('DELETE FROM wallets WHERE user_id = $1', [id]);
+    await pool.query('DELETE FROM notifications WHERE user_id = $1', [id]);
+    await pool.query('DELETE FROM seller_requests WHERE user_id = $1', [id]);
+    await pool.query('DELETE FROM favorites WHERE user_id = $1', [id]);
+    await pool.query('DELETE FROM audit_logs WHERE entity_id = $1 OR admin_id = $1', [id]);
+
+    // Handle conversations — delete messages then conversations where user is participant
+    const convs = await pool.query('SELECT id FROM conversations WHERE buyer_id = $1 OR seller_id = $1', [id]);
+    for (const c of convs.rows) {
+      await pool.query('DELETE FROM messages WHERE conversation_id = $1', [c.id]);
+    }
+    await pool.query('DELETE FROM conversations WHERE buyer_id = $1 OR seller_id = $1', [id]);
+
+    // Delete the user
+    await pool.query('DELETE FROM user_profiles WHERE id = $1', [id]);
+
+    res.json({ ok: true });
+  } catch (err: any) { res.status(500).json({ error: err.message }); }
+});
+
 // ============ SELLER REQUESTS ============
 router.get('/seller-requests', async (_req: AuthRequest, res) => {
   try {
