@@ -56,6 +56,23 @@ router.put('/users/:id/verify', async (req: AuthRequest, res) => {
   } catch (err: any) { res.status(500).json({ error: err.message }); }
 });
 
+router.put('/users/:id', async (req: AuthRequest, res) => {
+  try {
+    const { username, role, status, phone, is_verified, is_active } = req.body;
+    await pool.query(`UPDATE user_profiles SET
+      username = COALESCE($1, username),
+      role = COALESCE($2, role),
+      status = COALESCE($3, status),
+      phone = COALESCE($4, phone),
+      is_verified = COALESCE($5, is_verified),
+      is_active = COALESCE($6, is_active),
+      updated_at = NOW()
+      WHERE id = $7`,
+      [username, role, status, phone, is_verified, is_active, req.params.id]);
+    res.json({ ok: true });
+  } catch (err: any) { res.status(500).json({ error: err.message }); }
+});
+
 router.post('/users', async (req: AuthRequest, res) => {
   try {
     const { email, password, username, role } = req.body;
