@@ -18,7 +18,7 @@ const SORT_OPTIONS = [
 export default function Marketplace() {
   const [searchParams] = useSearchParams();
   const [searchQuery, setSearchQuery] = useState(searchParams.get('search') || '');
-  const [selectedCategory, setSelectedCategory] = useState('all');
+  const [selectedCategory, setSelectedCategory] = useState(searchParams.get('category') || 'all');
   const [sortBy, setSortBy] = useState('newest');
   const [favorites, setFavorites] = useState<string[]>([]);
   const [priceMin, setPriceMin] = useState('');
@@ -37,9 +37,19 @@ export default function Marketplace() {
   useEffect(() => {
     setListingsLoading(true);
     const timer = setTimeout(() => {
-      const catId = selectedCategory !== 'all' ? categories.find(c => c.slug === selectedCategory)?.id : undefined;
+      let catIds: string[] | undefined;
+      if (selectedCategory !== 'all') {
+        const cat = categories.find(c => c.slug === selectedCategory);
+        if (cat) {
+          // Include the selected category and all its subcategories
+          catIds = [
+            cat.id,
+            ...categories.filter(c => c.parentId === cat.id).map(c => c.id),
+          ];
+        }
+      }
       fetchListings({
-        categoryId: catId,
+        categoryIds: catIds,
         search: searchQuery || undefined,
         minPrice: priceMin ? Number(priceMin) : undefined,
         maxPrice: priceMax ? Number(priceMax) : undefined,

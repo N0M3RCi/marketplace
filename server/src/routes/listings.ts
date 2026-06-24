@@ -9,14 +9,24 @@ const router = Router();
 // GET /api/listings
 router.get('/', async (req, res) => {
   try {
-    const { categoryId, search, minPrice, maxPrice, sort, sellerId } = req.query;
+    const { categoryId, categoryIds, search, minPrice, maxPrice, sort, sellerId } = req.query;
     let sql = `SELECT l.*, c.name as category_name, up.username as seller_username, up.rating as seller_rating
       FROM listings l LEFT JOIN categories c ON l.category_id = c.id
       LEFT JOIN user_profiles up ON l.seller_id = up.id WHERE 1=1`;
     const params: any[] = [];
     let idx = 1;
     if (!sellerId) { sql += ` AND l.status = 'active'`; }
-    if (categoryId) { sql += ` AND l.category_id = $${idx++}`; params.push(categoryId); }
+    if (categoryIds) {
+      // categoryIds is a JSON array string like ["id1","id2"]
+      try {
+        const ids = JSON.parse(categoryIds as string);
+        if (Array.isArray(ids) && ids.length > 0) {
+          const placeholders = ids.map(() => `$${idx++}`);
+          sql += ` AND l.category_id IN (${placeholders.join(',')})`;
+          params.push(...ids);
+        }
+      } catch {}
+    } else if (categoryId) { sql += ` AND l.category_id = $${idx++}`; params.push(categoryId); }
     if (search) { sql += ` AND (LOWER(l.title) LIKE LOWER($${idx++}) OR LOWER(l.description) LIKE LOWER($${idx-1}))`; params.push(`%${search}%`); }
     if (minPrice) { sql += ` AND l.price >= $${idx++}`; params.push(minPrice); }
     if (maxPrice) { sql += ` AND l.price <= $${idx++}`; params.push(maxPrice); }

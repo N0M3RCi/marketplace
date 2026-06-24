@@ -9,13 +9,15 @@ export async function fetchCategories(): Promise<Category[]> {
 // ─── Listings ─────────────────────────────────────────────────
 export async function fetchListings(opts?: {
   categoryId?: string;
+  categoryIds?: string[];
   search?: string;
   minPrice?: number;
   maxPrice?: number;
   sort?: string;
 }): Promise<Listing[]> {
   const params: Record<string, string> = {};
-  if (opts?.categoryId) params.categoryId = opts.categoryId;
+  if (opts?.categoryIds?.length) params.categoryIds = JSON.stringify(opts.categoryIds);
+  else if (opts?.categoryId) params.categoryId = opts.categoryId;
   if (opts?.search) params.search = opts.search;
   if (opts?.minPrice) params.minPrice = String(opts.minPrice);
   if (opts?.maxPrice) params.maxPrice = String(opts.maxPrice);
