@@ -1,8 +1,8 @@
-import { useState, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Upload, X, Plus, Tag, DollarSign, MapPin, FileText, CheckCircle,
-  Loader2, ChevronLeft, Image as ImageIcon, AlertTriangle, Trash2, ShieldCheck
+  Loader2, ChevronLeft, AlertTriangle, Trash2, ShieldCheck
 } from 'lucide-react';
 import Navbar from '@/components/layout/Navbar';
 import { Button } from '@/components/ui/button';
@@ -67,6 +67,7 @@ export default function BulkUpload() {
     Array.from({ length: DEFAULT_SLOTS }, () => emptySlot())
   );
   const [submitting, setSubmitting] = useState(false);
+  const [processingIndex, setProcessingIndex] = useState<number>(-1);
   const [results, setResults] = useState<SlotResult[]>([]);
   const [showResults, setShowResults] = useState(false);
   const [sellers, setSellers] = useState<{ id: string; username: string; email: string }[]>([]);
@@ -78,14 +79,14 @@ export default function BulkUpload() {
   });
 
   // Load sellers for admin assignment
-  useState(() => {
+  useEffect(() => {
     if (user?.role === 'admin') {
       admin.users.list().then((data: any[]) => {
         const list = data.map((u: any) => ({ id: u.id, username: u.username || u.email?.split('@')[0] || 'Unknown', email: u.email }));
         setSellers(list);
       }).catch(() => {});
     }
-  });
+  }, [user]);
 
   const updateSlot = (idx: number, field: keyof ListingSlot, value: any) => {
     setSlots(prev => prev.map((slot, i) => i === idx ? { ...slot, [field]: value } : slot));
@@ -123,12 +124,12 @@ export default function BulkUpload() {
     for (const file of slot.images) {
       const ext = file.name.split('.').pop();
       const path = `${user?.id || 'admin'}/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
-      const { error } = await supabase.storage
+      const result = await supabase.storage
         .from('listing-images')
         .upload(path, file, { upsert: false });
-      if (error) { console.error('Image upload error:', error); continue; }
-      const { data } = supabase.storage.from('listing-images').getPublicUrl(path);
-      uploaded.push(data.publicUrl);
+      if (result.error) { console.error('Image upload error:', result.error); continue; }
+      // result.data.path contains the actual URL from the server: /api/storage/file/<id>
+      if (result.data?.path) uploaded.push(result.data.path);
     }
     return uploaded;
   };
@@ -152,6 +153,7 @@ export default function BulkUpload() {
     const slotResults: SlotResult[] = [];
 
     for (let i = 0; i < slots.length; i++) {
+      setProcessingIndex(i);
       const slot = slots[i];
       const validationError = isSlotValid(slot);
 
@@ -179,6 +181,7 @@ export default function BulkUpload() {
       }
     }
 
+    setProcessingIndex(-1);
     setResults(slotResults);
     setShowResults(true);
     setSubmitting(false);
@@ -318,8 +321,11 @@ export default function BulkUpload() {
                   {slot.title.trim() && (
                     <span className="text-xs truncate max-w-[200px]" style={{ color: 'rgba(255,255,255,0.50)' }}>{slot.title.trim()}</span>
                   )}
+                  {submitting && processingIndex === idx && (
+                    <Loader2 className="w-3 h-3 animate-spin" style={{ color: 'rgba(255,215,60,0.60)' }} />
+                  )}
                 </div>
-                {slots.length > 1 && (
+                {slots.length > 1 && !submitting && (
                   <button onClick={() => removeSlot(idx)} className="p-1 rounded transition-colors" style={{ color: 'rgba(239,68,68,0.5)' }}
                     onMouseEnter={e => (e.currentTarget as HTMLElement).style.color = 'rgba(239,68,68,0.9)'}
                     onMouseLeave={e => (e.currentTarget as HTMLElement).style.color = 'rgba(239,68,68,0.5)'}
@@ -448,9 +454,16 @@ export default function BulkUpload() {
         {/* Bottom Actions */}
         <div className="flex items-center justify-between gap-4 flex-wrap">
           <div>
-            <p className="text-xs" style={{ color: 'rgba(255,255,255,0.35)' }}>
-              {slots.filter(s => isSlotValid(s) === null).length} of {slots.length} slots ready
-            </p>
+            {submitting && processingIndex >= 0 ? (
+              <p className="text-xs" style={{ color: 'rgba(255,215,60,0.55)' }}>
+                <Loader2 className="w-3 h-3 animate-spin inline mr-1" />
+                Creating listing #{processingIndex + 1} of {slots.length}...
+              </p>
+            ) : (
+              <p className="text-xs" style={{ color: 'rgba(255,255,255,0.35)' }}>
+                {slots.filter(s => isSlotValid(s) === null).length} of {slots.length} slots ready
+              </p>
+            )}
           </div>
           <div className="flex gap-3">
             <Button

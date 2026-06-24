@@ -111,16 +111,14 @@ export default function CreateListing() {
     for (const file of form.images) {
       const ext = file.name.split('.').pop();
       const path = `${user.id}/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
-      const { error } = await supabase.storage
+      const result = await supabase.storage
         .from('listing-images')
         .upload(path, file, { upsert: false });
-
-      if (error) {
-        console.error('Image upload error:', error);
+      if (result.error) {
+        console.error('Image upload error:', result.error);
         continue;
       }
-      const { data } = supabase.storage.from('listing-images').getPublicUrl(path);
-      uploaded.push(data.publicUrl);
+      if (result.data?.path) uploaded.push(result.data.path);
     }
     setUploadingImages(false);
     return uploaded;
