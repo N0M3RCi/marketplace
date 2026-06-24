@@ -415,13 +415,14 @@ router.post('/categories', async (req: AuthRequest, res) => {
 
 router.put('/categories/:id', async (req: AuthRequest, res) => {
   try {
-    const { name, slug, icon, color, parent_id } = req.body;
+    const { name, slug, icon, color, parent_id, image_url } = req.body;
     const sets: string[] = []; const vals: any[] = []; let idx = 1;
     if (name !== undefined) { sets.push(`name = $${idx++}`); vals.push(name.trim()); }
     if (slug !== undefined) { sets.push(`slug = $${idx++}`); vals.push(slug); }
     if (icon !== undefined) { sets.push(`icon = $${idx++}`); vals.push(icon); }
     if (color !== undefined) { sets.push(`color = $${idx++}`); vals.push(color); }
     if (parent_id !== undefined) { sets.push(`parent_id = $${idx++}`); vals.push(parent_id || null); }
+    if (image_url !== undefined) { sets.push(`image_url = $${idx++}`); vals.push(image_url); }
     if (sets.length === 0) { res.json({ ok: true }); return; }
     vals.push(req.params.id);
     await pool.query(`UPDATE categories SET ${sets.join(', ')} WHERE id = $${idx}`, vals);

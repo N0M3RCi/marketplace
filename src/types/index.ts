@@ -23,6 +23,7 @@ export interface Category {
   color: string;
   parentId?: string | null;
   homepageFeatured?: boolean;
+  imageUrl?: string | null;
 }
 
 export interface Listing {

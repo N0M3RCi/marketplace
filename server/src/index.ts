@@ -180,6 +180,7 @@ async function runMigrations() {
         SELECT COUNT(*) FROM listings WHERE listings.category_id = categories.id AND listings.status = 'active'
       )` },
     { name: 'categories_homepage_featured', sql: `ALTER TABLE categories ADD COLUMN IF NOT EXISTS homepage_featured BOOLEAN DEFAULT false` },
+    { name: 'categories_image_url', sql: `ALTER TABLE categories ADD COLUMN IF NOT EXISTS image_url TEXT` },
   ];
 
   let allOk = true;

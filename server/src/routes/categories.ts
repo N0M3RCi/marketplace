@@ -17,6 +17,7 @@ router.get('/', async (req, res) => {
       id: c.id, name: c.name, slug: c.slug, icon: c.icon || 'Tag',
       listingCount: c.listing_count || 0, color: c.color || 'text-gray-600',
       parentId: c.parent_id || null, homepageFeatured: c.homepage_featured || false,
+      imageUrl: c.image_url || null,
     })));
   } catch (err: any) {
     res.status(500).json({ error: err.message });

@@ -3,7 +3,7 @@ import {
   Search, Plus, Loader2, RefreshCw, Edit2, X, Save, Trash2,
   Tag, Hash, Palette, FileText, ChevronRight, ChevronDown,
 } from 'lucide-react';
-import { admin } from '@/lib/client';
+import { admin, storage } from '@/lib/client';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 
@@ -15,6 +15,7 @@ interface Category {
   listing_count: number;
   color: string;
   parent_id: string | null;
+  image_url?: string | null;
 }
 
 interface EditForm {
@@ -23,6 +24,7 @@ interface EditForm {
   icon: string;
   color: string;
   parentId: string;
+  imageUrl: string;
 }
 
 const COLORS = [
@@ -50,7 +52,7 @@ export default function AdminCategories() {
   const [refreshing, setRefreshing] = useState(false);
   const [search, setSearch] = useState('');
   const [selectedCat, setSelectedCat] = useState<Category | null>(null);
-  const [editForm, setEditForm] = useState<EditForm>({ name: '', slug: '', icon: 'Tag', color: 'text-gray-600', parentId: '' });
+  const [editForm, setEditForm] = useState<EditForm>({ name: '', slug: '', icon: 'Tag', color: 'text-gray-600', parentId: '', imageUrl: '' });
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [creating, setCreating] = useState(false);
@@ -114,7 +116,7 @@ export default function AdminCategories() {
   const openCreate = () => {
     setCreating(true);
     setSelectedCat(null);
-    setEditForm({ name: '', slug: '', icon: 'Tag', color: 'text-gray-600', parentId: '' });
+    setEditForm({ name: '', slug: '', icon: 'Tag', color: 'text-gray-600', parentId: '', imageUrl: '' });
     setShowDeleteConfirm(false);
   };
 
@@ -127,6 +129,7 @@ export default function AdminCategories() {
       icon: cat.icon || 'Tag',
       color: cat.color || 'text-gray-600',
       parentId: cat.parent_id || '',
+      imageUrl: cat.image_url || '',
     });
     setShowDeleteConfirm(false);
   };
@@ -157,6 +160,7 @@ export default function AdminCategories() {
           icon: editForm.icon,
           color: editForm.color,
           parent_id: editForm.parentId || null,
+          image_url: editForm.imageUrl || null,
         });
         toast.success('Category updated');
       }
@@ -525,6 +529,48 @@ export default function AdminCategories() {
                       </button>
                     ))}
                   </div>
+                </div>
+
+                {/* Image */}
+                <div>
+                  <label className="block text-xs font-medium mb-1.5" style={{ color: '#9A7C40' }}>Cover Image</label>
+                  {editForm.imageUrl ? (
+                    <div className="relative rounded-xl overflow-hidden mb-2">
+                      <img src={editForm.imageUrl} alt="Category cover"
+                        className="w-full h-32 object-cover rounded-xl"
+                        style={{ border: '1px solid rgba(200,160,60,0.15)' }} />
+                      <button type="button" onClick={() => setEditForm(f => ({ ...f, imageUrl: '' }))}
+                        className="absolute top-2 right-2 w-7 h-7 rounded-lg flex items-center justify-center bg-white/80 backdrop-blur-sm transition-all hover:bg-white"
+                        style={{ border: '1px solid rgba(200,160,60,0.20)', color: '#9A7C40' }}>
+                        <X className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  ) : (
+                    <label className="flex flex-col items-center justify-center gap-2 py-6 rounded-xl cursor-pointer transition-all"
+                      style={{ background: 'rgba(200,160,60,0.06)', border: '1px dashed rgba(200,160,60,0.25)', color: '#9A7C40' }}
+                      onMouseEnter={e => { (e.currentTarget as HTMLElement).style.borderColor = 'rgba(200,160,60,0.45)'; (e.currentTarget as HTMLElement).style.background = 'rgba(200,160,60,0.10)'; }}
+                      onMouseLeave={e => { (e.currentTarget as HTMLElement).style.borderColor = 'rgba(200,160,60,0.25)'; (e.currentTarget as HTMLElement).style.background = 'rgba(200,160,60,0.06)'; }}>
+                      <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ background: 'rgba(200,160,60,0.12)', border: '1px solid rgba(200,160,60,0.20)' }}>
+                        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
+                      </div>
+                      <span className="text-xs font-medium">Click to upload cover image</span>
+                      <span className="text-[10px]">Shown as background in Browse by Category section</span>
+                      <input type="file" accept="image/*" className="hidden"
+                        onChange={async e => {
+                          const file = e.target.files?.[0];
+                          if (!file) return;
+                          try {
+                            const result = await storage.upload(file);
+                            setEditForm(f => ({ ...f, imageUrl: result.url }));
+                            toast.success('Image uploaded');
+                          } catch {
+                            toast.error('Failed to upload image');
+                          }
+                          e.target.value = '';
+                        }} />
+                    </label>
+                  )}
+                  <p className="text-[10px] mt-1" style={{ color: '#C8B090' }}>Recommended: 1200×600px or similar landscape ratio</p>
                 </div>
 
                 {/* Action buttons */}

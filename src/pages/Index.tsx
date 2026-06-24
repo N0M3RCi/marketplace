@@ -808,6 +808,20 @@ export default function Index() {
                         (e.currentTarget as HTMLElement).style.boxShadow = `${theme.shadow}, inset 0 1px 0 rgba(255,255,255,${idx === 0 ? '0.06' : '0.95'})`;
                       }}
                     >
+                      {/* Background image (if uploaded) */}
+                      {cat.imageUrl && (
+                        <>
+                          <img src={cat.imageUrl} alt={cat.name}
+                            className="absolute inset-0 w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
+                            style={{ opacity: 0.30, mixBlendMode: 'luminosity' }} />
+                          <div className="absolute inset-0" style={{
+                            background: idx === 0
+                              ? 'linear-gradient(to top, rgba(26,14,0,0.95) 0%, rgba(26,14,0,0.65) 40%, rgba(26,14,0,0.15) 100%)'
+                              : 'linear-gradient(to top, rgba(255,253,245,0.92) 0%, rgba(255,253,245,0.55) 50%, rgba(255,253,245,0.10) 100%)',
+                          }} />
+                        </>
+                      )}
+
                       {/* Top accent line */}
                       {idx === 0 && (
                         <div className="absolute top-0 left-0 right-0 h-px" style={{ background: theme.topLine }} />

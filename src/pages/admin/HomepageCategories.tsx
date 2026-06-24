@@ -137,6 +137,15 @@ export default function HomepageCategories() {
             {cat.listingCount}
           </div>
 
+          {/* Image indicator */}
+          <div className="hidden sm:flex items-center gap-1 text-xs px-2 py-1 rounded-lg" style={{
+            background: (cat as any).image_url ? 'rgba(59,130,246,0.10)' : 'rgba(200,180,140,0.10)',
+            color: (cat as any).image_url ? '#2563eb' : '#C8B090',
+            border: `1px solid ${(cat as any).image_url ? 'rgba(59,130,246,0.25)' : 'rgba(200,180,140,0.20)'}`,
+          }}>
+            <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
+          </div>
+
           {/* Toggle switch */}
           <button
             onClick={() => toggleFeatured(cat)}
