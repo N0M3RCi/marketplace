@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import bcryptjs from 'bcryptjs';
 import { adminOnly } from '../../middleware/auth.js';
 import type { AuthRequest } from '../../middleware/auth.js';
 import pool from '../../db.js';
@@ -52,6 +53,32 @@ router.put('/users/:id/verify', async (req: AuthRequest, res) => {
     const newVal = !curr.rows[0]?.is_verified;
     await pool.query('UPDATE user_profiles SET is_verified=$1 WHERE id=$2', [newVal, req.params.id]);
     res.json({ is_verified: newVal });
+  } catch (err: any) { res.status(500).json({ error: err.message }); }
+});
+
+router.post('/users', async (req: AuthRequest, res) => {
+  try {
+    const { email, password, username, role } = req.body;
+    if (!email || !password || !username) {
+      res.status(400).json({ error: 'Email, password, and username required' });
+      return;
+    }
+    const existing = await pool.query('SELECT id FROM user_profiles WHERE email = $1', [email]);
+    if (existing.rows.length > 0) {
+      res.status(409).json({ error: 'Email already registered' });
+      return;
+    }
+    const hash = await bcryptjs.hash(password, 10);
+    const id = uuid();
+    const userRole = role || 'buyer';
+    await pool.query(
+      'INSERT INTO user_profiles (id, email, username, password_hash, role) VALUES ($1,$2,$3,$4,$5)',
+      [id, email, username, hash, userRole]
+    );
+    try {
+      await pool.query('INSERT INTO wallets (user_id, balance, pending_balance, currency) VALUES ($1, 0, 0, $2)', [id, 'USD']);
+    } catch {}
+    res.status(201).json({ id, email, username, role: userRole });
   } catch (err: any) { res.status(500).json({ error: err.message }); }
 });
 

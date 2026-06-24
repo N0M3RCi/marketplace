@@ -139,6 +139,8 @@ export const paymentAddresses = {
 export const admin = {
   users: {
     list: () => request('/api/admin/users'),
+    create: (data: any) =>
+      request('/api/admin/users', { method: 'POST', body: JSON.stringify(data) }),
     updateRole: (id: string, role: string) =>
       request(`/api/admin/users/${id}/role`, { method: 'PUT', body: JSON.stringify({ role }) }),
     updateProfile: (id: string, data: any) =>

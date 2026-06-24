@@ -2,11 +2,12 @@ import { useState, useEffect, useCallback } from 'react';
 import {
   Search, Shield, CheckCircle, XCircle, Filter, Loader2,
   RefreshCw, Edit2, X, Save, User, Mail, Phone, Star,
-  ShieldCheck, ChevronRight, Hash,
+  ShieldCheck, ChevronRight, Hash, Plus,
   Ban, AlertTriangle, Crown, Store
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { supabase } from '@/lib/supabase';
+import { admin } from '@/lib/client';
 import { useAuth } from '@/hooks/useAuth';
 import { formatDate, getInitials, cn } from '@/lib/utils';
 import { toast } from 'sonner';
@@ -75,6 +76,9 @@ export default function AdminUsers() {
   const [sellerRequests, setSellerRequests] = useState<SellerRequest[]>([]);
   const [requestsLoading, setRequestsLoading] = useState(false);
   const [processingRequest, setProcessingRequest] = useState<string | null>(null);
+const [showCreateModal, setShowCreateModal] = useState(false);
+const [createForm, setCreateForm] = useState({ username: '', email: '', password: '', role: 'seller' });
+const [creating, setCreating] = useState(false);
 
   const fetchUsers = useCallback(async () => {
     const { data, error } = await supabase
@@ -262,6 +266,29 @@ export default function AdminUsers() {
     }
   };
 
+  const handleCreateUser = async () => {
+    if (!createForm.username.trim() || !createForm.email.trim() || !createForm.password.trim()) {
+      toast.error('Username, email, and password are required');
+      return;
+    }
+    setCreating(true);
+    try {
+      await admin.users.create({
+        username: createForm.username.trim(),
+        email: createForm.email.trim(),
+        password: createForm.password,
+        role: createForm.role,
+      });
+      toast.success(`User "${createForm.username}" created successfully`);
+      setShowCreateModal(false);
+      setCreateForm({ username: '', email: '', password: '', role: 'seller' });
+      await fetchUsers();
+    } catch (err: any) {
+      toast.error(err?.message || 'Failed to create user');
+    }
+    setCreating(false);
+  };
+
   const filtered = users.filter(u => {
     const q = search.toLowerCase();
     const matchSearch = !search || u.username.toLowerCase().includes(q) || u.email.toLowerCase().includes(q);
@@ -294,11 +321,20 @@ export default function AdminUsers() {
           <h1 className="font-heading text-2xl font-bold" style={{ color: '#2A1A00' }}>User Management</h1>
           <p className="text-sm mt-1" style={{ color: '#9A7C40' }}>{users.length} registered users · {pendingRequests.length} pending seller requests</p>
         </div>
-        <button onClick={handleRefresh} disabled={refreshing}
-          className="p-2 rounded-lg transition-colors"
-          style={{ border: '1px solid rgba(200,160,60,0.15)', color: '#9A7C40' }}>
-          <RefreshCw className={cn('w-4 h-4', refreshing && 'animate-spin')} />
-        </button>
+        <div className="flex items-center gap-2">
+          <button onClick={() => setShowCreateModal(true)}
+            className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-semibold transition-all"
+            style={{ background: '#C68000', color: '#FFF8E5', border: 'none' }}
+            onMouseEnter={e => (e.currentTarget as HTMLElement).style.background = '#A66800'}
+            onMouseLeave={e => (e.currentTarget as HTMLElement).style.background = '#C68000'}>
+            <Plus className="w-4 h-4" /> Create User
+          </button>
+          <button onClick={handleRefresh} disabled={refreshing}
+            className="p-2 rounded-lg transition-colors"
+            style={{ border: '1px solid rgba(200,160,60,0.15)', color: '#9A7C40' }}>
+            <RefreshCw className={cn('w-4 h-4', refreshing && 'animate-spin')} />
+          </button>
+        </div>
       </div>
 
       {/* Tabs */}
@@ -748,6 +784,75 @@ export default function AdminUsers() {
               </div>
             </div>
           )}
+        {/* Create User Modal */}
+      {showCreateModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ backdropFilter: 'blur(8px)', background: 'rgba(0,0,0,0.50)' }}>
+          <div className="w-full max-w-md rounded-2xl overflow-hidden bg-white shadow-2xl border border-border">
+            <div className="px-6 py-4 border-b border-border flex items-center justify-between" style={{ background: '#FFFDF5' }}>
+              <div>
+                <h2 className="font-heading font-bold" style={{ color: '#2A1A00' }}>Create User</h2>
+                <p className="text-xs mt-0.5" style={{ color: '#9A7C40' }}>Add a new seller or buyer account</p>
+              </div>
+              <button onClick={() => setShowCreateModal(false)} className="p-1.5 rounded-lg transition-colors hover:bg-muted" style={{ color: '#9A7C40' }}>
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            <div className="p-6 space-y-4">
+              <div>
+                <label className="block text-xs font-semibold mb-1.5" style={{ color: '#6B5D3D' }}>Username <span className="text-red-500">*</span></label>
+                <input value={createForm.username} onChange={e => setCreateForm(f => ({ ...f, username: e.target.value }))}
+                  placeholder="e.g. john_doe"
+                  className="w-full px-3 py-2.5 text-sm border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-[hsl(var(--brand-navy))] bg-white"
+                  style={{ color: '#2A1A00' }} />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold mb-1.5" style={{ color: '#6B5D3D' }}>Email <span className="text-red-500">*</span></label>
+                <input type="email" value={createForm.email} onChange={e => setCreateForm(f => ({ ...f, email: e.target.value }))}
+                  placeholder="e.g. john@example.com"
+                  className="w-full px-3 py-2.5 text-sm border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-[hsl(var(--brand-navy))] bg-white"
+                  style={{ color: '#2A1A00' }} />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold mb-1.5" style={{ color: '#6B5D3D' }}>Password <span className="text-red-500">*</span></label>
+                <input type="password" value={createForm.password} onChange={e => setCreateForm(f => ({ ...f, password: e.target.value }))}
+                  placeholder="Set a temporary password"
+                  className="w-full px-3 py-2.5 text-sm border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-[hsl(var(--brand-navy))] bg-white"
+                  style={{ color: '#2A1A00' }} />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold mb-1.5" style={{ color: '#6B5D3D' }}>Role</label>
+                <div className="grid grid-cols-2 gap-2">
+                  {Object.entries(ROLE_CONFIG).map(([k, v]) => (
+                    <button key={k} type="button" onClick={() => setCreateForm(f => ({ ...f, role: k }))}
+                      className={cn('flex items-center gap-2 px-3 py-2.5 rounded-xl text-xs font-medium text-left transition-all border', v.bg, v.color)}
+                      style={createForm.role === k ? { outline: '2px solid rgba(200,160,60,0.60)', outlineOffset: '1px', opacity: 1 } : { opacity: 0.55 }}>
+                      {k === 'admin' && <Crown className="w-3.5 h-3.5 flex-shrink-0" />}
+                      {k === 'buyer' && <User className="w-3.5 h-3.5 flex-shrink-0" />}
+                      {k === 'seller' && <Star className="w-3.5 h-3.5 flex-shrink-0" />}
+                      {k === 'both' && <ShieldCheck className="w-3.5 h-3.5 flex-shrink-0" />}
+                      {v.label}
+                      {createForm.role === k && <CheckCircle className="w-3 h-3 ml-auto flex-shrink-0" />}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+            <div className="flex gap-3 px-6 py-4 border-t border-border" style={{ background: '#FFFDF5' }}>
+              <button onClick={handleCreateUser} disabled={creating}
+                className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-semibold transition-all"
+                style={{ background: '#C68000', color: '#FFF8E5', border: 'none' }}
+                onMouseEnter={e => (e.currentTarget as HTMLButtonElement).style.background = '#A66800'}
+                onMouseLeave={e => (e.currentTarget as HTMLButtonElement).style.background = '#C68000'}>
+                {creating ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
+                {creating ? 'Creating...' : 'Create User'}
+              </button>
+              <button onClick={() => setShowCreateModal(false)}
+                className="px-5 py-2.5 rounded-xl text-sm transition-all border"
+                style={{ background: 'white', border: '1px solid rgba(200,160,60,0.25)', color: '#6B5D3D' }}>
+                Cancel
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>
