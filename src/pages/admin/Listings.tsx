@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import {
   Search, Edit2, Trash2, Eye, RefreshCw, Package, CheckCircle,
   XCircle, Filter, Loader2, Tag, MapPin, DollarSign, Save,
-  X, ExternalLink, Image as ImageIcon, ToggleLeft, ToggleRight, AlertTriangle, Plus, Upload, ChevronDown
+  X, ExternalLink, Image as ImageIcon, ToggleLeft, ToggleRight, AlertTriangle, Plus, Upload, ChevronDown, Star
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { admin, listings as listingsClient, storage as storageClient, categories as categoriesClient } from '@/lib/client';
@@ -38,6 +38,7 @@ interface EditForm {
   condition: string;
   location: string;
   status: string;
+  categoryId: string;
 }
 
 const STATUS_CONFIG: Record<string, { label: string; bg: string; color: string }> = {
@@ -63,6 +64,11 @@ export default function AdminListings() {
   const [saving, setSaving] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+  const [editImages, setEditImages] = useState<string[]>([]);
+  const [editImageFiles, setEditImageFiles] = useState<File[]>([]);
+  const [editImagePreviews, setEditImagePreviews] = useState<string[]>([]);
+  const [editUploading, setEditUploading] = useState(false);
+  const editFileRef = useRef<HTMLInputElement>(null);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [sellers, setSellers] = useState<{ id: string; username: string; email: string }[]>([]);
   const [createForm, setCreateForm] = useState({
@@ -229,12 +235,19 @@ export default function AdminListings() {
       condition: listing.condition,
       location: listing.location,
       status: listing.status,
+      categoryId: listing.categoryId || '',
     });
+    setEditImages(listing.images || []);
+    setEditImageFiles([]);
+    setEditImagePreviews([]);
   };
 
   const cancelEdit = () => {
     setEditingId(null);
-    setEditForm({ title: '', description: '', price: '', condition: '', location: '', status: '' });
+    setEditForm({ title: '', description: '', price: '', condition: '', location: '', status: '', categoryId: '' });
+    setEditImages([]);
+    setEditImageFiles([]);
+    setEditImagePreviews([]);
   };
 
   const saveEdit = async (listingId: string) => {
@@ -243,6 +256,22 @@ export default function AdminListings() {
     if (isNaN(price) || price <= 0) { toast.error('Enter a valid price'); return; }
 
     setSaving(true);
+
+    // Upload new images
+    let finalImages = [...editImages];
+    if (editImageFiles.length > 0) {
+      setEditUploading(true);
+      for (const file of editImageFiles) {
+        try {
+          const result = await storageClient.upload(file);
+          finalImages.push(result.url);
+        } catch {
+          toast.error('Image upload failed');
+        }
+      }
+      setEditUploading(false);
+    }
+
     try {
       await admin.listings.update(listingId, {
         title: editForm.title.trim(),
@@ -251,13 +280,18 @@ export default function AdminListings() {
         condition: editForm.condition,
         location: editForm.location.trim(),
         status: editForm.status,
+        category_id: editForm.categoryId || null,
+        images: finalImages,
       });
 
       await logAudit('edit_listing', 'listing', listingId,
-        `Updated listing "${editForm.title}" — price: ${formatCurrency(price)}, status: ${editForm.status}`);
+        `Updated listing "${editForm.title}" — price: ${formatCurrency(price)}, status: ${editForm.status}, images: ${finalImages.length}`);
 
       toast.success('Listing updated successfully');
       setEditingId(null);
+      setEditImages([]);
+      setEditImageFiles([]);
+      setEditImagePreviews([]);
       await fetchListings();
     } catch (err: any) {
       toast.error('Failed to save: ' + (err.message || 'Unknown error'));
@@ -292,6 +326,37 @@ export default function AdminListings() {
     }
     setDeletingId(null);
     await fetchListings();
+  };
+
+  const handleEditImagePick = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []).filter(f => f.size <= 10 * 1024 * 1024).slice(0, 8);
+    const previews = files.map(f => URL.createObjectURL(f));
+    setEditImageFiles(prev => [...prev, ...files].slice(0, 8));
+    setEditImagePreviews(prev => [...prev, ...previews].slice(0, 8));
+    if (editFileRef.current) editFileRef.current.value = '';
+  };
+
+  const handleRemoveEditImage = (idx: number) => {
+    // idx within existing images
+    if (idx < editImages.length) {
+      setEditImages(prev => prev.filter((_, i) => i !== idx));
+    } else {
+      // idx within previews
+      const previewIdx = idx - editImages.length;
+      URL.revokeObjectURL(editImagePreviews[previewIdx]);
+      setEditImageFiles(prev => prev.filter((_, i) => i !== previewIdx));
+      setEditImagePreviews(prev => prev.filter((_, i) => i !== previewIdx));
+    }
+  };
+
+  const handleMakeFeatured = (idx: number) => {
+    if (idx === 0) return; // already featured
+    if (idx < editImages.length) {
+      const reordered = [...editImages];
+      const [item] = reordered.splice(idx, 1);
+      reordered.unshift(item);
+      setEditImages(reordered);
+    }
   };
 
   const filtered = listings.filter(l => {
@@ -510,12 +575,80 @@ export default function AdminListings() {
                           </select>
                         </div>
                         <div>
+                          <label className="block text-xs font-medium mb-1">Category</label>
+                          <select value={editForm.categoryId} onChange={e => setEditForm(f => ({ ...f, categoryId: e.target.value }))}
+                            className="w-full px-3 py-2.5 text-sm border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-[hsl(var(--brand-navy))] bg-white">
+                            <option value="">Uncategorized</option>
+                            {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                          </select>
+                        </div>
+                        <div>
                           <label className="block text-xs font-medium mb-1">Status</label>
                           <select value={editForm.status} onChange={e => setEditForm(f => ({ ...f, status: e.target.value }))}
                             className="w-full px-3 py-2.5 text-sm border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-[hsl(var(--brand-navy))] bg-white">
                             {Object.entries(STATUS_CONFIG).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
                           </select>
                         </div>
+                      </div>
+
+                      {/* Images Section */}
+                      <div className="border-t border-border pt-4">
+                        <label className="block text-xs font-medium mb-2">Listing Images</label>
+                        <div className="grid grid-cols-4 gap-2 mb-2">
+                          {/* Existing + new images */}
+                          {editImages.map((url, idx) => (
+                            <div key={`existing-${idx}`} className="relative aspect-square rounded-lg overflow-hidden group border border-border bg-muted">
+                              <img src={url} alt="" className="w-full h-full object-cover"
+                                onError={(e) => { (e.currentTarget as HTMLImageElement).src = 'https://placehold.co/200x150?text=Image+Error'; }} />
+                              <div className="absolute inset-0 bg-black/0 group-hover:bg-black/40 transition-colors flex items-center justify-center gap-1 opacity-0 group-hover:opacity-100">
+                                <button type="button" onClick={() => handleRemoveEditImage(idx)}
+                                  className="w-7 h-7 rounded-full bg-red-500 text-white flex items-center justify-center hover:bg-red-600 transition-colors">
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                </button>
+                                {idx > 0 && (
+                                  <button type="button" onClick={() => handleMakeFeatured(idx)}
+                                    className="w-7 h-7 rounded-full bg-amber-500 text-white flex items-center justify-center hover:bg-amber-600 transition-colors">
+                                    <Star className="w-3.5 h-3.5" />
+                                  </button>
+                                )}
+                              </div>
+                              {idx === 0 && (
+                                <span className="absolute top-1 left-1 text-[10px] px-1.5 py-0.5 rounded-full bg-amber-500 text-white font-semibold shadow">
+                                  Featured
+                                </span>
+                              )}
+                            </div>
+                          ))}
+                          {/* New image previews (not yet uploaded) */}
+                          {editImagePreviews.map((url, idx) => (
+                            <div key={`new-${idx}`} className="relative aspect-square rounded-lg overflow-hidden border-2 border-dashed border-blue-300 bg-blue-50/30 group">
+                              <img src={url} alt="" className="w-full h-full object-cover" />
+                              <div className="absolute inset-0 bg-black/0 group-hover:bg-black/40 transition-colors flex items-center justify-center opacity-0 group-hover:opacity-100">
+                                <button type="button" onClick={() => handleRemoveEditImage(editImages.length + idx)}
+                                  className="w-7 h-7 rounded-full bg-red-500 text-white flex items-center justify-center hover:bg-red-600 transition-colors">
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                </button>
+                              </div>
+                              <span className="absolute top-1 left-1 text-[10px] px-1.5 py-0.5 rounded-full bg-blue-500 text-white font-semibold shadow">
+                                New
+                              </span>
+                            </div>
+                          ))}
+                          {/* Add image button */}
+                          {(editImages.length + editImagePreviews.length) < 8 && (
+                            <button type="button" onClick={() => editFileRef.current?.click()}
+                              className="aspect-square rounded-lg border-2 border-dashed border-border hover:border-[hsl(var(--brand-navy))] bg-muted/30 hover:bg-muted/50 transition-all flex flex-col items-center justify-center gap-1">
+                              <Upload className="w-5 h-5 text-muted-foreground/60" />
+                              <span className="text-[10px] text-muted-foreground/60 font-medium">Add Image</span>
+                            </button>
+                          )}
+                        </div>
+                        <input ref={editFileRef} type="file" accept="image/jpeg,image/png,image/webp" multiple onChange={handleEditImagePick} className="hidden" />
+                        <p className="text-[11px] text-muted-foreground">
+                          {editImages.length + editImagePreviews.length}/8 images
+                          {editImagePreviews.length > 0 && ` · ${editImagePreviews.length} new (not yet saved)`}
+                          {editImages.length > 0 && ' · Hover to delete or set as featured'}
+                        </p>
                       </div>
 
                       <div className="flex items-center gap-2 pt-2 border-t border-border">
