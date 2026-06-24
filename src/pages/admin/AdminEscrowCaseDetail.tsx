@@ -4,7 +4,7 @@ import {
   ArrowLeft, Shield, User, CreditCard, Package, Truck, CheckCircle, XCircle,
   AlertTriangle, Banknote, Clock, FileText, Download, ExternalLink, Plus,
   ChevronDown, ChevronUp, Loader2, Camera, Video, RefreshCw, MessageSquare,
-  Hash, DollarSign, Calendar, MapPin, Image as ImageIcon, PlayCircle, Settings
+  Hash, DollarSign, Calendar, MapPin, Image as ImageIcon, PlayCircle, Settings, Trash2
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { admin, escrow as escrowClient } from '@/lib/client';
@@ -100,6 +100,12 @@ export default function AdminEscrowCaseDetail() {
     courierName: '', trackingNumber: '', pickupDate: '', estimatedDeliveryDate: '', notes: ''
   });
   const [expandedSection, setExpandedSection] = useState<string | null>('payment');
+  const [showPaymentAddressForm, setShowPaymentAddressForm] = useState(false);
+  const [paymentAddressForm, setPaymentAddressForm] = useState({
+    paymentAddress: '',
+    paymentNetwork: 'BTC',
+    paymentMethod: 'crypto',
+  });
 
   const fetchCase = useCallback(async () => {
     if (!id) return;
@@ -261,6 +267,22 @@ export default function AdminEscrowCaseDetail() {
 
   // ─── Admin Actions ─────────────────────────────────────────
 
+  const handleSetPaymentAddress = async () => {
+    if (!paymentAddressForm.paymentAddress.trim()) {
+      toast.error('Payment address is required');
+      return;
+    }
+    const ok = await updateCase({
+      payment_address: paymentAddressForm.paymentAddress.trim(),
+      payment_network: paymentAddressForm.paymentNetwork,
+      payment_method: paymentAddressForm.paymentMethod,
+    }, undefined, undefined);
+    if (ok) {
+      toast.success('Payment address assigned to buyer.');
+      setShowPaymentAddressForm(false);
+    }
+  };
+
   const handleVerifyPayment = async () => {
     const ok = await updateCase(
       { payment_verified_at: new Date().toISOString(), payment_admin_notes: adminNote || null },
@@ -373,6 +395,40 @@ export default function AdminEscrowCaseDetail() {
     if (ok) toast.success(`Refund of ${formatCurrency(escrowCase!.amount, escrowCase!.currency)} issued.`);
   };
 
+  const handleMarkCompleted = async () => {
+    const ok = await updateCase(
+      {},
+      'completed',
+      'Case Marked as Completed by Administrator',
+      adminNote || undefined
+    );
+    if (ok) toast.success('Case marked as completed.');
+  };
+
+  const handleMarkCancelled = async () => {
+    if (!confirm('Are you sure you want to cancel this escrow case? This may affect both buyer and seller.')) return;
+    const ok = await updateCase(
+      {},
+      'cancelled',
+      'Case Cancelled by Administrator',
+      adminNote || undefined
+    );
+    if (ok) toast.success('Case cancelled.');
+  };
+
+  const handleDeleteCase = async () => {
+    if (!confirm('Are you sure you want to permanently delete this escrow case? All timeline and notification data will also be removed.')) return;
+    setSaving(true);
+    try {
+      await admin.escrow.delete(id!);
+      toast.success('Escrow case deleted');
+      navigate('/admin/escrow');
+    } catch (err: any) {
+      toast.error('Failed to delete case: ' + (err.message || 'Unknown error'));
+    }
+    setSaving(false);
+  };
+
   const handleResolveDispute = async (outcome: string) => {
     const outcomeLabels: Record<string, string> = {
       full_refund: 'Full Refund Issued',
@@ -427,9 +483,9 @@ export default function AdminEscrowCaseDetail() {
   const canScheduleDelivery = escrowCase.status === 'packaging_approved' && !escrowCase.courierName;
   const hasDelivery = !!escrowCase.courierName;
   const canUpdateDelivery = hasDelivery && ['pickup_scheduled', 'in_transit', 'out_for_delivery'].includes(escrowCase.deliveryStatus || '');
-  const canMarkDelivered = hasDelivery && escrowCase.status !== 'delivered' && escrowCase.status !== 'funds_released' && escrowCase.status !== 'refunded';
+  const canMarkDelivered = hasDelivery && escrowCase.status !== 'delivered' && escrowCase.status !== 'funds_released' && escrowCase.status !== 'refunded' && escrowCase.status !== 'completed' && escrowCase.status !== 'cancelled';
   const canReleaseFunds = ['buyer_confirmed', 'delivered'].includes(escrowCase.status);
-  const canRefund = !['funds_released', 'refunded', 'closed'].includes(escrowCase.status);
+  const canRefund = !['completed', 'cancelled', 'funds_released', 'refunded', 'closed'].includes(escrowCase.status);
   const hasActiveDispute = escrowCase.disputeStatus && escrowCase.disputeStatus !== 'resolved';
 
   const Section = ({ id: sId, title, icon: Icon, badge, children }: any) => (
@@ -615,6 +671,107 @@ export default function AdminEscrowCaseDetail() {
                     </div>
                   )}
                 </>
+              ) : escrowCase.status === 'awaiting_payment' ? (
+                <div className="space-y-4">
+                  {escrowCase.paymentAddress ? (
+                    <>
+                      <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-xl">
+                        <div className="flex items-center justify-between mb-2">
+                          <p className="text-xs font-semibold text-emerald-700">Payment Address Assigned</p>
+                          <button
+                            onClick={() => {
+                              setPaymentAddressForm({
+                                paymentAddress: escrowCase.paymentAddress || '',
+                                paymentNetwork: escrowCase.paymentNetwork || 'BTC',
+                                paymentMethod: escrowCase.paymentMethod || 'crypto',
+                              });
+                              setShowPaymentAddressForm(true);
+                            }}
+                            className="text-[11px] text-emerald-600 underline hover:text-emerald-800"
+                          >
+                            Change
+                          </button>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <code className="text-xs font-mono bg-white border border-emerald-200 rounded px-2 py-1 flex-1 break-all">
+                            {escrowCase.paymentAddress}
+                          </code>
+                          <span className="text-[10px] bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full font-medium">
+                            {escrowCase.paymentNetwork || 'BTC'}
+                          </span>
+                        </div>
+                      </div>
+                      <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl text-xs text-amber-700">
+                        <Clock className="w-4 h-4 inline-block mr-1" />
+                        Waiting for buyer to send crypto to this address and submit payment proof.
+                      </div>
+                    </>
+                  ) : showPaymentAddressForm ? (
+                    <div className="space-y-3 p-4 bg-muted/30 rounded-xl border border-border">
+                      <h3 className="text-sm font-medium">Assign Payment Address</h3>
+                      <div>
+                        <label className="block text-xs font-medium mb-1.5">Crypto Address *</label>
+                        <input
+                          value={paymentAddressForm.paymentAddress}
+                          onChange={e => setPaymentAddressForm(p => ({ ...p, paymentAddress: e.target.value }))}
+                          placeholder="bc1q... / 0x... / T..."
+                          className="w-full px-3 py-2.5 text-sm font-mono border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-[hsl(var(--brand-navy))]"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium mb-1.5">Network</label>
+                        <select
+                          value={paymentAddressForm.paymentNetwork}
+                          onChange={e => setPaymentAddressForm(p => ({ ...p, paymentNetwork: e.target.value }))}
+                          className="w-full px-3 py-2.5 text-sm border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-[hsl(var(--brand-navy))] bg-white"
+                        >
+                          <option value="BTC">Bitcoin (BTC)</option>
+                          <option value="USDT-TRC20">Tether USDT (TRC20)</option>
+                          <option value="USDC-ERC20">USD Coin USDC (ERC20)</option>
+                        </select>
+                      </div>
+                      <div className="flex gap-2">
+                        <button
+                          onClick={handleSetPaymentAddress}
+                          disabled={saving}
+                          className="flex-1 navy-gradient text-white border-0 rounded-xl py-2.5 text-sm font-semibold flex items-center justify-center gap-1.5 hover:opacity-90 transition-opacity"
+                        >
+                          {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle className="w-4 h-4" />}
+                          Assign Address & Notify Buyer
+                        </button>
+                        <button
+                          onClick={() => setShowPaymentAddressForm(false)}
+                          className="px-4 py-2.5 rounded-xl text-sm border border-border text-muted-foreground hover:bg-muted transition-colors"
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="flex flex-col items-center gap-3 py-6 text-center">
+                      <Banknote className="w-10 h-10 text-muted-foreground/30" />
+                      <div>
+                        <p className="text-sm font-medium text-foreground mb-1">Assign a Payment Address</p>
+                        <p className="text-xs text-muted-foreground max-w-sm">
+                          Provide your crypto wallet address (BTC, USDT, or USDC) so the buyer knows where to send payment.
+                        </p>
+                      </div>
+                      <button
+                        onClick={() => {
+                          setPaymentAddressForm({
+                            paymentAddress: escrowCase.paymentAddress || '',
+                            paymentNetwork: escrowCase.paymentNetwork || 'BTC',
+                            paymentMethod: escrowCase.paymentMethod || 'crypto',
+                          });
+                          setShowPaymentAddressForm(true);
+                        }}
+                        className="navy-gradient text-white border-0 rounded-xl px-5 py-2 text-sm font-semibold flex items-center gap-2 hover:opacity-90 transition-opacity"
+                      >
+                        <Plus className="w-4 h-4" /> Provide Payment Address
+                      </button>
+                    </div>
+                  )}
+                </div>
               ) : (
                 <div className="py-4 text-center text-muted-foreground">
                   <CreditCard className="w-8 h-8 mx-auto mb-2 opacity-30" />
@@ -911,6 +1068,39 @@ export default function AdminEscrowCaseDetail() {
                   <CheckCircle className="w-4 h-4" /> Refund issued to buyer
                 </div>
               )}
+
+              {/* Completed / Cancelled status indicators */}
+              {escrowCase.status === 'completed' && (
+                <div className="flex items-center gap-2 text-xs text-emerald-700 bg-emerald-50 border border-emerald-200 p-3 rounded-xl">
+                  <CheckCircle className="w-4 h-4" /> Case marked as completed
+                </div>
+              )}
+              {escrowCase.status === 'cancelled' && (
+                <div className="flex items-center gap-2 text-xs text-slate-600 bg-slate-50 border border-slate-200 p-3 rounded-xl">
+                  <XCircle className="w-4 h-4" /> Case cancelled
+                </div>
+              )}
+
+              {/* Completed / Cancelled / Delete actions */}
+              {!['completed', 'cancelled', 'closed', 'funds_released', 'refunded'].includes(escrowCase.status) && (
+                <div className="space-y-3 pt-4 border-t border-border">
+                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Terminal Actions</p>
+                  <div className="flex gap-2">
+                    <Button onClick={handleMarkCompleted} disabled={saving}
+                      className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white border-0 text-xs">
+                      <CheckCircle className="w-4 h-4 mr-1.5" /> Mark Completed
+                    </Button>
+                    <Button onClick={handleMarkCancelled} disabled={saving} variant="outline"
+                      className="flex-1 border-slate-300 text-slate-600 hover:bg-slate-50 text-xs">
+                      <XCircle className="w-4 h-4 mr-1.5" /> Cancel Case
+                    </Button>
+                    <Button onClick={handleDeleteCase} disabled={saving} variant="outline"
+                      className="flex-1 border-red-300 text-red-600 hover:bg-red-50 text-xs">
+                      <Trash2 className="w-4 h-4 mr-1.5" /> Delete Case
+                    </Button>
+                  </div>
+                </div>
+              )}
             </div>
           </Section>
 
@@ -1010,6 +1200,31 @@ export default function AdminEscrowCaseDetail() {
                   {ESCROW_STATUS_CONFIG[status]?.label || status}
                 </button>
               ))}
+              {/* Terminal statuses */}
+              <button
+                disabled={saving || escrowCase.status === 'completed'}
+                onClick={() => handleForceStatus('completed')}
+                className={cn(
+                  'px-2.5 py-2 text-[11px] font-medium rounded-lg border transition-colors',
+                  escrowCase.status === 'completed'
+                    ? 'bg-emerald-600 text-white border-emerald-600'
+                    : 'border-emerald-300 text-emerald-700 hover:bg-emerald-50'
+                )}
+              >
+                Completed
+              </button>
+              <button
+                disabled={saving || escrowCase.status === 'cancelled'}
+                onClick={() => handleForceStatus('cancelled')}
+                className={cn(
+                  'px-2.5 py-2 text-[11px] font-medium rounded-lg border transition-colors',
+                  escrowCase.status === 'cancelled'
+                    ? 'bg-slate-500 text-white border-slate-500'
+                    : 'border-slate-300 text-slate-600 hover:bg-slate-50'
+                )}
+              >
+                Cancelled
+              </button>
             </div>
           </div>
 

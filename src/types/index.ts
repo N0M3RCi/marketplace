@@ -61,6 +61,8 @@ export type EscrowStatus =
   | 'funds_released'
   | 'refunded'
   | 'disputed'
+  | 'completed'
+  | 'cancelled'
   | 'closed';
 
 export interface EscrowCase {

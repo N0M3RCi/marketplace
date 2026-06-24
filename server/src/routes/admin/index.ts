@@ -190,10 +190,22 @@ router.get('/escrow/:id', async (req: AuthRequest, res) => {
 router.put('/escrow/:id', async (req: AuthRequest, res) => {
   try {
     const sets: string[] = ['updated_at = NOW()']; const vals: any[] = []; let idx = 1;
-    const allowed = ['status','admin_notes','payment_admin_notes','payment_verified_at','payment_rejected_at','payment_submitted_at','payment_proof_url','payment_reference','payment_amount_sent','delivery_status','delivery_notes','dispute_status','dispute_outcome','dispute_admin_notes','dispute_resolved_at','payout_status','courier_name','tracking_number','pickup_date','estimated_delivery_date','actual_delivery_date','delivered_at','seller_evidence_status','seller_evidence_admin_notes','packaging_approved_at','seller_item_photos','seller_packaging_photos','seller_packaging_video','funds_released_at','refunded_at'];
+    const allowed = ['status','admin_notes','payment_address','payment_network','payment_method','payment_admin_notes','payment_verified_at','payment_rejected_at','payment_submitted_at','payment_proof_url','payment_reference','payment_amount_sent','delivery_status','delivery_notes','dispute_status','dispute_outcome','dispute_admin_notes','dispute_resolved_at','payout_status','courier_name','tracking_number','pickup_date','estimated_delivery_date','actual_delivery_date','delivered_at','seller_evidence_status','seller_evidence_admin_notes','packaging_approved_at','seller_item_photos','seller_packaging_photos','seller_packaging_video','funds_released_at','refunded_at'];
     for (const f of allowed) { if (req.body[f] !== undefined) { sets.push(`${f} = $${idx++}`); vals.push(req.body[f]); } }
     vals.push(req.params.id);
     await pool.query(`UPDATE escrow_cases SET ${sets.join(',')} WHERE id=$${idx}`, vals);
+    res.json({ ok: true });
+  } catch (err: any) { res.status(500).json({ error: err.message }); }
+});
+
+router.delete('/escrow/:id', async (req: AuthRequest, res) => {
+  try {
+    // Delete timeline events first
+    await pool.query('DELETE FROM escrow_timeline WHERE case_id = $1', [req.params.id]);
+    // Delete notifications referencing this case
+    await pool.query('DELETE FROM notifications WHERE case_id = $1', [req.params.id]);
+    // Delete the escrow case
+    await pool.query('DELETE FROM escrow_cases WHERE id = $1', [req.params.id]);
     res.json({ ok: true });
   } catch (err: any) { res.status(500).json({ error: err.message }); }
 });

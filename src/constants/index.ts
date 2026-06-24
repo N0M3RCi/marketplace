@@ -15,7 +15,9 @@ export const ESCROW_STATUS_CONFIG: Record<EscrowStatus, { label: string; color: 
   funds_released: { label: 'Funds Released', color: 'text-emerald-700', bg: 'bg-emerald-50', step: 12 },
   refunded: { label: 'Refunded', color: 'text-rose-700', bg: 'bg-rose-100', step: 13 },
   disputed: { label: 'Disputed', color: 'text-red-700', bg: 'bg-red-100', step: 0 },
-  closed: { label: 'Closed', color: 'text-slate-600', bg: 'bg-slate-100', step: 14 },
+  completed: { label: 'Completed', color: 'text-emerald-700', bg: 'bg-emerald-100', step: 14 },
+  cancelled: { label: 'Cancelled', color: 'text-slate-500', bg: 'bg-slate-100', step: 14 },
+  closed: { label: 'Closed', color: 'text-slate-600', bg: 'bg-slate-100', step: 15 },
 };
 
 export const ESCROW_TIMELINE_STEPS: EscrowStatus[] = [

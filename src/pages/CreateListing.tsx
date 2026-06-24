@@ -454,13 +454,13 @@ export default function CreateListing() {
                     <span className="font-medium" style={{ color: 'rgba(255,255,255,0.82)' }}>{form.currency} {Number(form.price).toLocaleString()}</span>
                   </div>
                   <div className="flex justify-between">
-                    <span style={{ color: 'rgba(255,255,255,0.45)' }}>Platform Fee (3%)</span>
-                    <span className="font-medium" style={{ color: 'rgba(255,255,255,0.38)' }}>− {form.currency} {(Number(form.price) * 0.03).toFixed(2)}</span>
+                    <span style={{ color: 'rgba(255,255,255,0.45)' }}>Platform Fee (2%)</span>
+                    <span className="font-medium" style={{ color: 'rgba(255,255,255,0.38)' }}>− {form.currency} {(Number(form.price) * 0.02).toFixed(2)}</span>
                   </div>
                   <div className="flex justify-between pt-2" style={{ borderTop: '1px solid rgba(255,255,255,0.07)' }}>
                     <span className="font-semibold" style={{ color: 'rgba(255,255,255,0.80)' }}>You receive</span>
                     <span className="font-bold" style={{ color: 'rgba(255,215,60,0.85)' }}>
-                      {form.currency} {(Number(form.price) * 0.97).toFixed(2)}
+                      {form.currency} {(Number(form.price) * 0.98).toFixed(2)}
                     </span>
                   </div>
                 </div>

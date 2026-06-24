@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';
-import { Search, ChevronRight, Eye, Filter, RefreshCw, Plus, AlertCircle } from 'lucide-react';
+import { Search, ChevronRight, Eye, Filter, RefreshCw, Plus, AlertCircle, Trash2 } from 'lucide-react';
 import StatusBadge from '@/components/features/StatusBadge';
 import { Button } from '@/components/ui/button';
 import { admin } from '@/lib/client';
@@ -29,7 +29,7 @@ interface CaseRow {
 const ALL_STATUSES: EscrowStatus[] = [
   'awaiting_payment', 'payment_submitted', 'payment_verified', 'seller_notified',
   'item_ready', 'packaging_submitted', 'packaging_approved', 'pickup_scheduled',
-  'in_transit', 'delivered', 'buyer_confirmed', 'funds_released', 'refunded', 'disputed', 'closed'
+  'in_transit', 'delivered', 'buyer_confirmed', 'funds_released', 'refunded', 'disputed', 'completed', 'cancelled', 'closed'
 ];
 
 export default function EscrowCases() {
@@ -38,6 +38,7 @@ export default function EscrowCases() {
   const [refreshing, setRefreshing] = useState(false);
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<EscrowStatus | 'all'>('all');
+  const [deletingId, setDeletingId] = useState<string | null>(null);
 
   const fetchCases = useCallback(async () => {
     let data;
@@ -70,6 +71,19 @@ export default function EscrowCases() {
     setLoading(true);
     fetchCases().finally(() => setLoading(false));
   }, [fetchCases]);
+
+  const handleDeleteCase = async (id: string) => {
+    if (!confirm('Are you sure you want to permanently delete this escrow case? This action cannot be undone.')) return;
+    setDeletingId(id);
+    try {
+      await admin.escrow.delete(id);
+      toast.success('Escrow case deleted');
+      await fetchCases();
+    } catch (err: any) {
+      toast.error('Failed to delete case: ' + (err.message || 'Unknown error'));
+    }
+    setDeletingId(null);
+  };
 
   const handleRefresh = async () => {
     setRefreshing(true);
@@ -232,10 +246,20 @@ export default function EscrowCases() {
                     </td>
                     <td className="px-4 py-3.5 text-xs text-muted-foreground">{formatDate(c.createdAt)}</td>
                     <td className="px-4 py-3.5">
-                      <Link to={`/admin/escrow/${c.id}`}
-                        className="flex items-center gap-1 text-xs font-semibold text-[hsl(var(--brand-navy))] hover:underline whitespace-nowrap">
-                        <Eye className="w-3.5 h-3.5" /> Manage
-                      </Link>
+                      <div className="flex items-center gap-2">
+                        <Link to={`/admin/escrow/${c.id}`}
+                          className="flex items-center gap-1 text-xs font-semibold text-[hsl(var(--brand-navy))] hover:underline whitespace-nowrap">
+                          <Eye className="w-3.5 h-3.5" /> Manage
+                        </Link>
+                        <button
+                          onClick={() => handleDeleteCase(c.id)}
+                          disabled={deletingId === c.id}
+                          className="text-xs text-red-500 hover:text-red-700 transition-colors disabled:opacity-40"
+                          title="Delete case"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))}

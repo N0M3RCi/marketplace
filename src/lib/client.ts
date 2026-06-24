@@ -159,6 +159,8 @@ export const admin = {
         method: 'PUT',
         body: JSON.stringify({ delivery_status: deliveryStatus, status: escrowStatus }),
       }),
+    delete: (id: string) =>
+      request(`/api/admin/escrow/${id}`, { method: 'DELETE' }),
   },
   wallets: {
     list: () => request('/api/admin/wallets'),

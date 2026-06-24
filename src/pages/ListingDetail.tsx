@@ -124,7 +124,7 @@ export default function ListingDetail() {
 
     // Generate case number
     const caseNumber = `ESC-${new Date().getFullYear()}${String(new Date().getMonth() + 1).padStart(2, '0')}${String(new Date().getDate()).padStart(2, '0')}-${Math.random().toString(36).substring(2, 6).toUpperCase()}`;
-    const fees = listing.price * 0.03;
+    const fees = listing.price * 0.02;
 
     // Validate IDs are real UUIDs (mock listings use IDs like "listing-1")
     const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -279,7 +279,6 @@ export default function ListingDetail() {
                   { label: 'Category', value: listing.categoryName },
                   { label: 'Condition', value: CONDITION_LABELS[listing.condition] || listing.condition },
                   { label: 'Location', value: listing.location || 'Not specified' },
-                  { label: 'Listed', value: formatDate(listing.createdAt) },
                   { label: 'Currency', value: listing.currency },
                   { label: 'Listing ID', value: listing.id.substring(0, 8) + '…' },
                 ].map(({ label, value }) => (
@@ -347,8 +346,8 @@ export default function ListingDetail() {
 
               {/* Platform fee notice */}
               <div className="flex items-center justify-between text-xs text-muted-foreground mb-4 bg-muted/30 rounded-lg px-3 py-2">
-                <span>Platform escrow fee (3%)</span>
-                <span className="font-medium">{formatCurrency(listing.price * 0.03, listing.currency)}</span>
+                <span>Platform escrow fee (2%)</span>
+                <span className="font-medium">{formatCurrency(listing.price * 0.02, listing.currency)}</span>
               </div>
 
               {userStatus === 'restricted' || userStatus === 'blocked' ? (
@@ -414,13 +413,13 @@ export default function ListingDetail() {
                           <span className="font-semibold">{formatCurrency(listing.price, listing.currency)}</span>
                         </div>
                         <div className="flex items-center justify-between text-sm">
-                          <span className="text-muted-foreground">Escrow fee (3%)</span>
-                          <span className="text-muted-foreground">{formatCurrency(listing.price * 0.03, listing.currency)}</span>
+                          <span className="text-muted-foreground">Escrow fee (2%)</span>
+                          <span className="text-muted-foreground">{formatCurrency(listing.price * 0.02, listing.currency)}</span>
                         </div>
                         <div className="h-px bg-border" />
                         <div className="flex items-center justify-between">
                           <span className="font-semibold text-sm">Total to send</span>
-                          <span className="text-lg font-bold text-[hsl(var(--brand-navy))]">{formatCurrency(listing.price + listing.price * 0.03, listing.currency)}</span>
+                          <span className="text-lg font-bold text-[hsl(var(--brand-navy))]">{formatCurrency(listing.price + listing.price * 0.02, listing.currency)}</span>
                         </div>
                       </div>
 
