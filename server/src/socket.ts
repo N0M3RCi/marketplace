@@ -24,10 +24,14 @@ interface SocketUser {
 }
 
 export function setupSocket(httpServer: HTTPServer) {
+  const CORS_ORIGIN = process.env.CORS_ORIGIN
+    ? process.env.CORS_ORIGIN.split(',').map(s => s.trim())
+    : ['http://localhost:3000'];
   const io = new Server(httpServer, {
     cors: {
-      origin: '*',
+      origin: CORS_ORIGIN,
       methods: ['GET', 'POST'],
+      credentials: true,
     },
   });
 

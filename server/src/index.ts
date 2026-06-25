@@ -1,4 +1,5 @@
 import express from 'express';
+import helmet from 'helmet';
 import cors from 'cors';
 import path from 'path';
 import http from 'http';
@@ -32,8 +33,33 @@ const PORT = parseInt(process.env.PORT || '3001', 10);
 // Ready flag: blocked until migrations complete
 let dbReady = false;
 
+// Determine trusted CORS origins from env or dev default
+const CORS_ORIGIN = process.env.CORS_ORIGIN
+  ? process.env.CORS_ORIGIN.split(',').map(s => s.trim())
+  : ['http://localhost:3000'];
+
 // Middleware
-app.use(cors());
+app.disable('x-powered-by');
+app.use(cors({ origin: CORS_ORIGIN, credentials: true }));
+app.use(helmet({
+  strictTransportSecurity: {
+    maxAge: 31536000,
+    includeSubDomains: true,
+  },
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc: ["'self'"],
+      scriptSrc: ["'self'"],
+      styleSrc: ["'self'", "'unsafe-inline'"],
+      imgSrc: ["'self'", "data:", "blob:"],
+      connectSrc: ["'self'", "ws:", "wss:"],
+      fontSrc: ["'self'"],
+      frameAncestors: ["'none'"],
+      formAction: ["'self'"],
+    },
+  },
+  crossOriginEmbedderPolicy: false,
+}));
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 
@@ -110,7 +136,7 @@ app.use((err: any, _req: express.Request, res: express.Response, _next: express.
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const distPath = path.resolve(__dirname, '../../dist');
 
-app.use(express.static(distPath));
+app.use(express.static(distPath, { maxAge: '1h' }));
 app.get('*', (_req, res) => {
   res.sendFile(path.join(distPath, 'index.html'));
 });
