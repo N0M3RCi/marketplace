@@ -36,7 +36,17 @@ router.get('/', async (req: AuthRequest, res) => {
 // POST /api/conversations (get-or-create)
 router.post('/', async (req: AuthRequest, res) => {
   try {
-    const { listingId, listingTitle, buyerId, sellerId } = req.body;
+    const { listingId, listingTitle, sellerId } = req.body;
+    if (!listingId || !sellerId) {
+      res.status(400).json({ error: 'listingId and sellerId are required' });
+      return;
+    }
+    if (!req.userId) {
+      res.status(401).json({ error: 'Not authenticated' });
+      return;
+    }
+    // Use the authenticated user as the buyer — ignore any buyerId from the body
+    const buyerId = req.userId;
     // Check existing
     const existing = await pool.query(
       'SELECT id FROM conversations WHERE listing_id = $1 AND buyer_id = $2 AND seller_id = $3',

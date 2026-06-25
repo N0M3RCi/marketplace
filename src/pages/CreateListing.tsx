@@ -96,11 +96,15 @@ export default function CreateListing() {
   };
 
   const removeImage = (idx: number) => {
-    setForm(prev => ({
-      ...prev,
-      images: prev.images.filter((_, i) => i !== idx),
-      imageUrls: prev.imageUrls.filter((_, i) => i !== idx),
-    }));
+    setForm(prev => {
+      const removed = prev.imageUrls[idx];
+      if (removed) URL.revokeObjectURL(removed);
+      return {
+        ...prev,
+        images: prev.images.filter((_, i) => i !== idx),
+        imageUrls: prev.imageUrls.filter((_, i) => i !== idx),
+      };
+    });
   };
 
   const uploadImages = async (): Promise<string[]> => {

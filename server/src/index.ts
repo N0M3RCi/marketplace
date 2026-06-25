@@ -5,6 +5,7 @@ import http from 'http';
 import { fileURLToPath } from 'url';
 import pool from './db.js';
 import { authMiddleware } from './middleware/auth.js';
+import { apiLimiter, authLimiter } from './middleware/rateLimiter.js';
 import authRoutes from './routes/auth.js';
 import categoriesRoutes from './routes/categories.js';
 import listingsRoutes from './routes/listings.js';
@@ -35,6 +36,10 @@ let dbReady = false;
 app.use(cors());
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ extended: true, limit: '50mb' }));
+
+// Rate limiting
+app.use('/api/', apiLimiter); // Global: 100 requests per 15 min
+app.use('/api/auth', authLimiter); // Stricter: 10 requests per 15 min
 
 // JSON body parser error handler (malformed JSON → readable 400)
 app.use((err: any, _req: express.Request, res: express.Response, next: express.NextFunction) => {
@@ -70,7 +75,7 @@ app.use('/api/messages', authMiddleware, messagesRoutes);
 app.use('/api/notifications', authMiddleware, notificationsRoutes);
 app.use('/api/escrow', authMiddleware, escrowRoutes);
 app.use('/api/wallet', authMiddleware, walletRoutes);
-app.use('/api/storage', storageRoutes);
+app.use('/api/storage', authMiddleware, storageRoutes);
 app.use('/api/profile', authMiddleware, profileRoutes);
 app.use('/api/reviews', authMiddleware, reviewsRoutes);
 app.use('/api/seller-requests', authMiddleware, sellerRequestRoutes);

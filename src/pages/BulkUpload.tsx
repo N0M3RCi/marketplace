@@ -115,6 +115,8 @@ export default function BulkUpload() {
 
   const removeImage = (slotIdx: number, imgIdx: number) => {
     const slot = slots[slotIdx];
+    const removed = slot.imageUrls[imgIdx];
+    if (removed) URL.revokeObjectURL(removed);
     updateSlot(slotIdx, 'images', slot.images.filter((_, i) => i !== imgIdx));
     updateSlot(slotIdx, 'imageUrls', slot.imageUrls.filter((_, i) => i !== imgIdx));
   };

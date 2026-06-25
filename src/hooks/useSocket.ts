@@ -35,8 +35,10 @@ export function useSocket(options: UseSocketOptions) {
   } = options;
 
   const socketRef = useRef<Socket | null>(null);
+  const prevConversationIdRef = useRef<string | null | undefined>(null);
+  const typingTimersRef = useRef<Map<string, NodeJS.Timeout>>(new Map());
   const [connected, setConnected] = useState(false);
-  const [typingUsers, setTypingUsers] = useState<Record<string, { username: string; timeout: NodeJS.Timeout }>>({});
+  const [typingUsers, setTypingUsers] = useState<Record<string, { username: string }>>({});
   const onNewMessageRef = useRef(onNewMessage);
   const onConversationReadRef = useRef(onConversationRead);
   const onTypingUpdateRef = useRef(onTypingUpdate);
@@ -80,29 +82,33 @@ export function useSocket(options: UseSocketOptions) {
       if (data.userId === userId) return;
       onTypingUpdateRef.current?.(data);
 
+      const key = data.conversationId + ':' + data.userId;
+      const timers = typingTimersRef.current;
+
       if (data.isTyping) {
-        setTypingUsers(prev => {
-          const existing = prev[data.conversationId + ':' + data.userId];
-          if (existing) clearTimeout(existing.timeout);
-          return {
-            ...prev,
-            [data.conversationId + ':' + data.userId]: {
-              username: data.username || 'Someone',
-              timeout: setTimeout(() => {
-                setTypingUsers(prev2 => {
-                  const next = { ...prev2 };
-                  delete next[data.conversationId + ':' + data.userId];
-                  return next;
-                });
-              }, 3000),
-            },
-          };
-        });
+        // Clear existing timer for this user
+        const existing = timers.get(key);
+        if (existing) clearTimeout(existing);
+        // Set new auto-expire timer stored in ref, not in state
+        const timer = setTimeout(() => {
+          setTypingUsers(prev => {
+            const next = { ...prev };
+            delete next[key];
+            return next;
+          });
+          timers.delete(key);
+        }, 3000);
+        timers.set(key, timer);
+
+        setTypingUsers(prev => ({
+          ...prev,
+          [key]: { username: data.username || 'Someone' },
+        }));
       } else {
+        const timer = timers.get(key);
+        if (timer) { clearTimeout(timer); timers.delete(key); }
         setTypingUsers(prev => {
           const next = { ...prev };
-          const key = data.conversationId + ':' + data.userId;
-          if (next[key]) clearTimeout(next[key].timeout);
           delete next[key];
           return next;
         });
@@ -116,6 +122,10 @@ export function useSocket(options: UseSocketOptions) {
     socketRef.current = socket;
 
     return () => {
+      // Clear all typing timers
+      typingTimersRef.current.forEach(timer => clearTimeout(timer));
+      typingTimersRef.current.clear();
+      setTypingUsers({});
       socket.disconnect();
       socketRef.current = null;
       setConnected(false);
@@ -127,9 +137,22 @@ export function useSocket(options: UseSocketOptions) {
     const socket = socketRef.current;
     if (!socket || !connected) return;
 
+    const prevId = prevConversationIdRef.current;
+    if (prevId && prevId !== conversationId) {
+      socket.emit('leave:conversation', prevId);
+    }
+
     if (conversationId) {
       socket.emit('join:conversation', conversationId);
     }
+    prevConversationIdRef.current = conversationId;
+
+    return () => {
+      if (conversationId) {
+        socket.emit('leave:conversation', conversationId);
+      }
+      prevConversationIdRef.current = null;
+    };
   }, [conversationId, connected]);
 
   const sendMessage = useCallback((data: {
@@ -140,8 +163,8 @@ export function useSocket(options: UseSocketOptions) {
     fileUrl?: string;
     fileName?: string;
     fileSize?: number;
-  }) => {
-    socketRef.current?.emit('message:send', data);
+  }, onAck?: (response: { ok: boolean; error?: string }) => void) => {
+    socketRef.current?.emit('message:send', data, onAck);
   }, []);
 
   const markConversationRead = useCallback((convId: string, isBuyer: boolean) => {

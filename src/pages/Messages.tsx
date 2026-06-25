@@ -103,10 +103,13 @@ export default function Messages() {
   }, [user]);
 
   // Load messages for active conversation
+  const conversationsRef = useRef(conversations);
+  conversationsRef.current = conversations;
+
   useEffect(() => {
     if (!activeConvId || !user) return;
     setMsgsLoading(true);
-    const conv = conversations.find(c => c.id === activeConvId);
+    const conv = conversationsRef.current.find(c => c.id === activeConvId);
     const isBuyer = conv?.buyerId === user.id;
 
     fetchMessages(activeConvId)
@@ -158,11 +161,18 @@ export default function Messages() {
         return;
       }
       setUploadingFile(false);
-      setFilePreview(null);
     }
+
+    // Revoke the preview URL to avoid memory leak
+    setFilePreview(prev => {
+      if (prev?.preview) URL.revokeObjectURL(prev.preview);
+      return null;
+    });
 
     setNewMessage('');
     setSending(true);
+
+    const prevConvState = conversations.find(c => c.id === activeConvId);
 
     socket.sendMessage({
       conversationId: activeConvId,
@@ -172,6 +182,13 @@ export default function Messages() {
       fileUrl,
       fileName,
       fileSize,
+    }, (ack) => {
+      if (!ack.ok && prevConvState) {
+        setConversations(prev => prev.map(c =>
+          c.id === activeConvId ? prevConvState : c
+        ));
+        toast.error(ack.error || 'Failed to send message');
+      }
     });
 
     setConversations(prev => prev.map(c =>

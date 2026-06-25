@@ -125,7 +125,8 @@ class QueryBuilder {
       const url = `${API}${endpoint}${params ? `?${params}` : ''}`;
       const res = await fetch(url, { headers });
       if (!res.ok) {
-        return { data: this._single ? null : [], error: null, count: null };
+        const errBody = await res.json().catch(() => ({ error: `Request failed: ${res.status}` }));
+        return { data: this._single ? null : [], error: new Error(errBody.error || `Request failed: ${res.status}`), count: null };
       }
       const data = await res.json();
       return { data: this._single ? (Array.isArray(data) ? data[0] : data) : data, error: null, count: (Array.isArray(data) ? data.length : null) };

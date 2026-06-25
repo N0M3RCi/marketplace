@@ -25,16 +25,17 @@ export default function Marketplace() {
   const [showFilters, setShowFilters] = useState(false);
   const [listings, setListings] = useState<Listing[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
+  const [categoriesLoaded, setCategoriesLoaded] = useState(false);
   const [listingsLoading, setListingsLoading] = useState(true);
 
   // Load categories from backend
   useEffect(() => {
-    fetchCategories().then(cats => { if (cats.length > 0) setCategories(cats); }).catch(() => {});
+    fetchCategories().then(cats => { setCategories(cats); setCategoriesLoaded(true); }).catch(() => setCategoriesLoaded(true));
   }, []);
 
   // Load listings from backend with debounce (wait for categories first)
   useEffect(() => {
-    if (categories.length === 0) return; // Wait for categories to load first
+    if (!categoriesLoaded) return; // Wait for categories to load first
     setListingsLoading(true);
     const timer = setTimeout(() => {
       let catIds: string[] | undefined;

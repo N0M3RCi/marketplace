@@ -227,7 +227,7 @@ export default function Login() {
                 </button>
                 <p className="text-center text-xs" style={{ color: '#9A7C40' }}>
                   Didn't receive it?{' '}
-                  <button type="button" onClick={() => sendOtp(regEmail).then(() => toast.success('Code resent!'))} className="font-semibold hover:underline" style={{ color: '#C68000' }}>
+                  <button type="button" onClick={() => sendOtp(regEmail).then(() => toast.success('Code resent!')).catch(() => toast.error('OTP is not supported — use email/password login'))} className="font-semibold hover:underline" style={{ color: '#C68000' }}>
                     Resend
                   </button>
                 </p>

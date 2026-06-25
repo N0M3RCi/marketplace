@@ -2,6 +2,7 @@ import { Router } from 'express';
 import pool from '../db.js';
 import { authMiddleware } from '../middleware/auth.js';
 import type { AuthRequest } from '../middleware/auth.js';
+import { sanitizeText, sanitizeDescription } from '../middleware/sanitizer.js';
 import { v4 as uuid } from 'uuid';
 
 const router = Router();
@@ -53,10 +54,10 @@ router.get('/:id', async (req, res) => {
   try {
     const result = await pool.query(`
       SELECT l.*, c.name as category_name, up.id as sp_id, up.username as sp_username, up.rating as sp_rating,
-        up.email as sp_email, up.avatar_url as sp_avatar, up.is_verified as sp_verified, up.total_transactions as sp_txns
+        up.avatar_url as sp_avatar, up.is_verified as sp_verified, up.total_transactions as sp_txns
       FROM listings l LEFT JOIN categories c ON l.category_id = c.id
       LEFT JOIN user_profiles up ON l.seller_id = up.id WHERE l.id = $1`, [req.params.id]);
-    if (result.rows.length === 0) { res.json(null); return; }
+    if (result.rows.length === 0) { res.status(404).json({ error: 'Listing not found' }); return; }
     const l = result.rows[0];
     // Increment view count
     await pool.query('UPDATE listings SET view_count = COALESCE(view_count, 0) + 1 WHERE id = $1', [l.id]);
@@ -66,7 +67,7 @@ router.get('/:id', async (req, res) => {
       sellerId: l.seller_id, sellerName: l.sp_username || 'Unknown', sellerRating: Number(l.sp_rating) || 5,
       images: l.images || [], condition: l.condition || 'good', location: l.location || '',
       status: l.status, createdAt: l.created_at, viewCount: (l.view_count || 0) + 1,
-      sellerProfile: { id: l.sp_id, username: l.sp_username, rating: l.sp_rating, email: l.sp_email, avatar_url: l.sp_avatar, is_verified: l.sp_verified, total_transactions: l.sp_txns },
+      sellerProfile: { id: l.sp_id, username: l.sp_username, rating: l.sp_rating, avatar_url: l.sp_avatar, is_verified: l.sp_verified, total_transactions: l.sp_txns },
     });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
@@ -78,12 +79,16 @@ router.post('/', authMiddleware, async (req: AuthRequest, res) => {
   try {
     const { title, description, price, currency, categoryId, images, condition, location, sellerId } = req.body;
     const id = uuid();
+    // Sanitize user input
+    const safeTitle = sanitizeText(title, 200);
+    const safeDescription = sanitizeDescription(description || '', 50000);
+    if (!safeTitle) { res.status(400).json({ error: 'Title is required' }); return; }
     // Admin can attribute listings to a specific user; non-admin always use own ID
     const effectiveSellerId = (req.userRole === 'admin' && sellerId) ? sellerId : req.userId;
     const result = await pool.query(`
       INSERT INTO listings (id, title, description, price, currency, category_id, seller_id, images, condition, location)
       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) RETURNING *`, [
-      id, title, description, price, currency || 'USD', categoryId, effectiveSellerId,
+      id, safeTitle, safeDescription, price, currency || 'USD', categoryId, effectiveSellerId,
       images || [], condition || 'good', location || ''
     ]);
     const l = result.rows[0];
@@ -103,8 +108,8 @@ router.put('/:id', authMiddleware, async (req: AuthRequest, res) => {
   try {
     const { title, description, price, currency, categoryId, images, condition, location, status } = req.body;
     const sets: string[] = []; const vals: any[] = []; let idx = 1;
-    if (title !== undefined) { sets.push(`title = $${idx++}`); vals.push(title); }
-    if (description !== undefined) { sets.push(`description = $${idx++}`); vals.push(description); }
+    if (title !== undefined) { sets.push(`title = $${idx++}`); vals.push(sanitizeText(title, 200)); }
+    if (description !== undefined) { sets.push(`description = $${idx++}`); vals.push(sanitizeDescription(description, 50000)); }
     if (price !== undefined) { sets.push(`price = $${idx++}`); vals.push(price); }
     if (currency !== undefined) { sets.push(`currency = $${idx++}`); vals.push(currency); }
     if (categoryId !== undefined) { sets.push(`category_id = $${idx++}`); vals.push(categoryId); }

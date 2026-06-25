@@ -1090,6 +1090,19 @@ function FileUploadArea({ files, accept, label, onAdd, onRemove }: {
   files: File[]; accept: string; label: string;
   onAdd: (files: File[]) => void; onRemove: (idx: number) => void;
 }) {
+  const previewUrlsRef = useRef<string[]>([]);
+
+  // Sync preview URLs with files: create new ones, revoke stale ones
+  useEffect(() => {
+    const newUrls = files.map(f => URL.createObjectURL(f));
+    // Revoke previous URLs that are no longer needed
+    previewUrlsRef.current.forEach(url => URL.revokeObjectURL(url));
+    previewUrlsRef.current = newUrls;
+    return () => {
+      newUrls.forEach(url => URL.revokeObjectURL(url));
+    };
+  }, [files]);
+
   return (
     <div>
       <label className="block text-xs font-medium mb-2">{label}</label>
@@ -1104,7 +1117,7 @@ function FileUploadArea({ files, accept, label, onAdd, onRemove }: {
         <div className="grid grid-cols-5 gap-2 mt-2">
           {files.map((f, i) => (
             <div key={i} className="relative aspect-square rounded-xl overflow-hidden border border-border group">
-              <img src={URL.createObjectURL(f)} alt="" className="w-full h-full object-cover" />
+              <img src={previewUrlsRef.current[i] || ''} alt="" className="w-full h-full object-cover" />
               <button onClick={() => onRemove(i)}
                 className="absolute top-1 right-1 w-5 h-5 bg-black/60 text-white rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
                 <X className="w-3 h-3" />

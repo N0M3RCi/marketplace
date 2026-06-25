@@ -1,7 +1,19 @@
 import jwt from 'jsonwebtoken';
 import type { Request, Response, NextFunction } from 'express';
 
-const JWT_SECRET = process.env.JWT_SECRET || 'safeescrow-dev-secret-key-change-in-production';
+function getJwtSecret(): string {
+  const secret = process.env.JWT_SECRET;
+  if (!secret) {
+    console.warn(
+      'WARNING: JWT_SECRET environment variable is not set. ' +
+      'Using a hardcoded fallback is INSECURE for production. ' +
+      'Set JWT_SECRET in your environment (e.g. openssl rand -hex 32).'
+    );
+    return 'safeescrow-dev-secret-key-change-in-production';
+  }
+  return secret;
+}
+const JWT_SECRET = getJwtSecret();
 
 export interface AuthRequest extends Request {
   userId?: string;

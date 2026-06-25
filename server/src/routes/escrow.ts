@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import pool from '../db.js';
 import type { AuthRequest } from '../middleware/auth.js';
+import { sendEscrowNotification } from '../services/email.js';
 import { v4 as uuid } from 'uuid';
 
 const router = Router();
@@ -81,6 +82,13 @@ router.post('/', async (req: AuthRequest, res) => {
     try {
       await pool.query(`INSERT INTO notifications (user_id, type, title, message, case_id) VALUES ($1,'new_escrow_case','New Escrow Case Opened', $2, $3)`,
         [sellerId, `A buyer has opened an escrow case for your listing "${listingTitle || ''}".`, id]);
+      // Fire and forget email notification
+      const sellerResult = await pool.query('SELECT email, username FROM user_profiles WHERE id = $1', [sellerId]);
+      if (sellerResult.rows.length > 0) {
+        const { email, username } = sellerResult.rows[0];
+        sendEscrowNotification(email, username, id, 'new_escrow_case',
+          `A buyer has opened an escrow case for your listing "${listingTitle || ''}". Please log in to review and prepare your item.`).catch(() => {});
+      }
     } catch {}
     res.status(201).json({ id });
   } catch (err: any) {

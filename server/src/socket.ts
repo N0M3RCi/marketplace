@@ -2,8 +2,21 @@ import { Server as HTTPServer } from 'http';
 import { Server } from 'socket.io';
 import jwt from 'jsonwebtoken';
 import pool from './db.js';
+import { sanitizeText } from './middleware/sanitizer.js';
 
-const JWT_SECRET = process.env.JWT_SECRET || 'safeescrow-dev-secret-key-change-in-production';
+function getJwtSecret(): string {
+  const secret = process.env.JWT_SECRET;
+  if (!secret) {
+    console.warn(
+      'WARNING: JWT_SECRET environment variable is not set. ' +
+      'Using a hardcoded fallback is INSECURE for production. ' +
+      'Set JWT_SECRET in your environment (e.g. openssl rand -hex 32).'
+    );
+    return 'safeescrow-dev-secret-key-change-in-production';
+  }
+  return secret;
+}
+const JWT_SECRET = getJwtSecret();
 
 interface SocketUser {
   userId: string;
@@ -87,10 +100,11 @@ export function setupSocket(httpServer: HTTPServer) {
       fileUrl?: string;
       fileName?: string;
       fileSize?: number;
-    }) => {
+    }, callback?: (response: { ok: boolean; error?: string }) => void) => {
       const { conversationId, content, isBuyer, imageUrl, fileUrl, fileName, fileSize } = data;
-      if (!conversationId || !content?.trim()) {
-        socket.emit('error', 'Conversation ID and content are required');
+      const safeContent = sanitizeText(content || '', 5000);
+      if (!conversationId || !safeContent) {
+        callback?.({ ok: false, error: 'Conversation ID and content are required' });
         return;
       }
 
@@ -102,7 +116,7 @@ export function setupSocket(httpServer: HTTPServer) {
         const result = await pool.query(
           `INSERT INTO messages (id, conversation_id, sender_id, content, image_url, file_url, file_name, file_size)
            VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING *`,
-          [id, conversationId, user.userId, content.trim(),
+          [id, conversationId, user.userId, safeContent,
            imageUrl || null, fileUrl || null, fileName || null, fileSize || null]
         );
 
@@ -111,7 +125,7 @@ export function setupSocket(httpServer: HTTPServer) {
         await pool.query(
           `UPDATE conversations SET last_message = $1, last_message_at = NOW(),
            updated_at = NOW(), ${unreadField} = ${unreadField} + 1 WHERE id = $2`,
-          [content.substring(0, 100), conversationId]
+          [safeContent.substring(0, 100), conversationId]
         );
 
         const msg = result.rows[0];
@@ -128,6 +142,9 @@ export function setupSocket(httpServer: HTTPServer) {
           isRead: msg.is_read,
           createdAt: msg.created_at,
         };
+
+        // Acknowledge success to sender
+        callback?.({ ok: true });
 
         // Emit to conversation room
         io.to(`conv:${conversationId}`).emit('message:new', messageData);
@@ -147,6 +164,7 @@ export function setupSocket(httpServer: HTTPServer) {
           });
         }
       } catch (err: any) {
+        callback?.({ ok: false, error: 'Failed to send message: ' + err.message });
         socket.emit('error', 'Failed to send message: ' + err.message);
       }
     });
@@ -163,7 +181,9 @@ export function setupSocket(httpServer: HTTPServer) {
           conversationId: data.conversationId,
           readBy: user.userId,
         });
-      } catch {}
+      } catch (err) {
+        console.error('Failed to mark conversation read:', err);
+      }
     });
 
     // Typing indicators

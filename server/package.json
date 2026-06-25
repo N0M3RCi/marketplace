@@ -7,29 +7,40 @@
     "dev": "PORT=3001 tsx watch src/index.ts",
     "start": "tsx src/index.ts",
     "migrate": "PORT=3001 tsx src/migrate.ts",
-    "seed": "PORT=3001 tsx src/seed.ts"
+    "seed": "PORT=3001 tsx src/seed.ts",
+    "test": "vitest run",
+    "test:watch": "vitest"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",
     "cors": "^2.8.5",
     "express": "^4.21.0",
+    "express-rate-limit": "^8.5.2",
     "jsonwebtoken": "^9.0.2",
     "multer": "^1.4.5-lts.1",
+    "nodemailer": "^9.0.1",
     "pg": "^8.13.0",
+    "sanitize-html": "^2.17.5",
     "socket.io": "^4.8.3",
     "socket.io-client": "^4.8.3",
     "tsx": "^4.19.0",
     "uuid": "^10.0.0"
   },
   "devDependencies": {
+    "@testing-library/jest-dom": "^6.9.1",
+    "@testing-library/react": "^16.3.2",
     "@types/bcryptjs": "^2.4.6",
     "@types/cors": "^2.8.17",
     "@types/express": "^4.17.21",
     "@types/jsonwebtoken": "^9.0.7",
     "@types/multer": "^1.4.12",
     "@types/node": "^22.5.5",
+    "@types/nodemailer": "^8.0.1",
     "@types/pg": "^8.11.10",
+    "@types/sanitize-html": "^2.16.1",
     "@types/uuid": "^10.0.0",
-    "typescript": "^5.5.3"
+    "jsdom": "^29.1.1",
+    "typescript": "^5.5.3",
+    "vitest": "^4.1.9"
   }
 }
