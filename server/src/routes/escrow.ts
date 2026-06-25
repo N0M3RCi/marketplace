@@ -2,6 +2,9 @@ import { Router } from 'express';
 import pool from '../db.js';
 import type { AuthRequest } from '../middleware/auth.js';
 import { sendEscrowNotification } from '../services/email.js';
+import { validate } from '../middleware/validate.js';
+import * as escrowSchemas from '../schemas/escrow.js';
+import { auditLog } from '../middleware/auditLogger.js';
 import { v4 as uuid } from 'uuid';
 
 const router = Router();
@@ -64,7 +67,7 @@ router.get('/:id', async (req: AuthRequest, res) => {
 });
 
 // POST /api/escrow
-router.post('/', async (req: AuthRequest, res) => {
+router.post('/', validate(escrowSchemas.createEscrow), async (req: AuthRequest, res) => {
   try {
     const { listingId, listingTitle, sellerId, amount, fees, currency } = req.body;
     const buyerId = req.userId;
@@ -90,6 +93,7 @@ router.post('/', async (req: AuthRequest, res) => {
           `A buyer has opened an escrow case for your listing "${listingTitle || ''}". Please log in to review and prepare your item.`).catch(() => {});
       }
     } catch {}
+    auditLog('create_escrow', { adminId: buyerId, entityType: 'escrow', entityId: id, details: `Escrow created: ${listingTitle || ''}`, ipAddress: req.ip });
     res.status(201).json({ id });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
@@ -97,7 +101,7 @@ router.post('/', async (req: AuthRequest, res) => {
 });
 
 // PUT /api/escrow/:id
-router.put('/:id', async (req: AuthRequest, res) => {
+router.put('/:id', validate(escrowSchemas.updateEscrow), async (req: AuthRequest, res) => {
   try {
     const updates: string[] = []; const vals: any[] = []; let idx = 1;
     const allowed = ['status', 'payment_address', 'payment_network', 'payment_method', 'payment_reference',
@@ -117,6 +121,7 @@ router.put('/:id', async (req: AuthRequest, res) => {
     updates.push('updated_at = NOW()');
     vals.push(req.params.id);
     await pool.query(`UPDATE escrow_cases SET ${updates.join(', ')} WHERE id = $${idx}`, vals);
+    auditLog('update_escrow', { adminId: req.userId, entityType: 'escrow', entityId: req.params.id, details: 'Escrow updated', ipAddress: req.ip });
     res.json({ ok: true });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
@@ -137,7 +142,7 @@ router.get('/:id/timeline', async (req: AuthRequest, res) => {
 });
 
 // POST /api/escrow/timeline
-router.post('/timeline', async (req: AuthRequest, res) => {
+router.post('/timeline', validate(escrowSchemas.addTimeline), async (req: AuthRequest, res) => {
   try {
     const { caseId, status, label, actorName, actorRole, notes } = req.body;
     await pool.query(
@@ -181,6 +186,7 @@ router.delete('/:id', async (req: AuthRequest, res) => {
     await pool.query('DELETE FROM escrow_timeline WHERE case_id = $1', [caseId]);
     await pool.query('DELETE FROM notifications WHERE case_id = $1', [caseId]);
     await pool.query('DELETE FROM escrow_cases WHERE id = $1', [caseId]);
+    auditLog('delete_escrow', { adminId: userId, entityType: 'escrow', entityId: caseId, details: 'Escrow cancelled by buyer', ipAddress: req.ip });
 
     res.json({ ok: true });
   } catch (err: any) {

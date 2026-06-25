@@ -9,9 +9,12 @@
     "migrate": "PORT=3001 tsx src/migrate.ts",
     "seed": "PORT=3001 tsx src/seed.ts",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "audit": "npm audit --audit-level=high",
+    "safety": "vitest run && npm audit --audit-level=high"
   },
   "dependencies": {
+    "argon2": "^0.44.0",
     "bcryptjs": "^2.4.3",
     "cors": "^2.8.5",
     "express": "^4.21.0",
@@ -25,7 +28,8 @@
     "socket.io": "^4.8.3",
     "socket.io-client": "^4.8.3",
     "tsx": "^4.19.0",
-    "uuid": "^10.0.0"
+    "uuid": "^10.0.0",
+    "zod": "^4.4.3"
   },
   "devDependencies": {
     "@testing-library/jest-dom": "^6.9.1",

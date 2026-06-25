@@ -56,6 +56,7 @@ app.use(helmet({
       fontSrc: ["'self'"],
       frameAncestors: ["'none'"],
       formAction: ["'self'"],
+      reportUri: '/api/csp-violation',
     },
   },
   crossOriginEmbedderPolicy: false,
@@ -108,6 +109,14 @@ app.use('/api/seller-requests', authMiddleware, sellerRequestRoutes);
 app.use('/api/payment-addresses', authMiddleware, paymentAddressesRoutes);
 app.use('/api/admin', authMiddleware, adminRoutes);
 
+// CSP violation report endpoint — accepts reports from browsers when CSP is violated
+app.use('/api/csp-violation', express.text({ type: '*/*' }));
+app.post('/api/csp-violation', (req, res) => {
+  const report = typeof req.body === 'string' ? req.body : JSON.stringify(req.body);
+  console.warn('CSP Violation:', report ? report.substring(0, 2000) : 'Empty report');
+  res.status(204).send();
+});
+
 // Health check (includes database status)
 app.get('/api/health', async (_req, res) => {
   try {
@@ -136,7 +145,7 @@ app.use((err: any, _req: express.Request, res: express.Response, _next: express.
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const distPath = path.resolve(__dirname, '../../dist');
 
-app.use(express.static(distPath, { maxAge: '1h' }));
+app.use(express.static(distPath, { maxAge: '30d' }));
 app.get('*', (_req, res) => {
   res.sendFile(path.join(distPath, 'index.html'));
 });

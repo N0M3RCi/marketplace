@@ -3,6 +3,9 @@ import pool from '../db.js';
 import { authMiddleware } from '../middleware/auth.js';
 import type { AuthRequest } from '../middleware/auth.js';
 import { sanitizeText, sanitizeDescription } from '../middleware/sanitizer.js';
+import { validate } from '../middleware/validate.js';
+import * as listingSchemas from '../schemas/listings.js';
+import { auditLog } from '../middleware/auditLogger.js';
 import { v4 as uuid } from 'uuid';
 
 const router = Router();
@@ -75,14 +78,13 @@ router.get('/:id', async (req, res) => {
 });
 
 // POST /api/listings
-router.post('/', authMiddleware, async (req: AuthRequest, res) => {
+router.post('/', authMiddleware, validate(listingSchemas.createListing), async (req: AuthRequest, res) => {
   try {
     const { title, description, price, currency, categoryId, images, condition, location, sellerId } = req.body;
     const id = uuid();
     // Sanitize user input
     const safeTitle = sanitizeText(title, 200);
     const safeDescription = sanitizeDescription(description || '', 50000);
-    if (!safeTitle) { res.status(400).json({ error: 'Title is required' }); return; }
     // Admin can attribute listings to a specific user; non-admin always use own ID
     const effectiveSellerId = (req.userRole === 'admin' && sellerId) ? sellerId : req.userId;
     const result = await pool.query(`
@@ -92,6 +94,7 @@ router.post('/', authMiddleware, async (req: AuthRequest, res) => {
       images || [], condition || 'good', location || ''
     ]);
     const l = result.rows[0];
+    auditLog('create_listing', { adminId: effectiveSellerId, entityType: 'listing', entityId: l.id, details: `Listing created: ${safeTitle}`, ipAddress: req.ip });
     res.status(201).json({
       id: l.id, title: l.title, description: l.description, price: Number(l.price),
       currency: l.currency, categoryId: l.category_id, sellerId: l.seller_id,
@@ -104,7 +107,7 @@ router.post('/', authMiddleware, async (req: AuthRequest, res) => {
 });
 
 // PUT /api/listings/:id
-router.put('/:id', authMiddleware, async (req: AuthRequest, res) => {
+router.put('/:id', authMiddleware, validate(listingSchemas.updateListing), async (req: AuthRequest, res) => {
   try {
     const { title, description, price, currency, categoryId, images, condition, location, status } = req.body;
     const sets: string[] = []; const vals: any[] = []; let idx = 1;
@@ -121,6 +124,7 @@ router.put('/:id', authMiddleware, async (req: AuthRequest, res) => {
     sets.push(`updated_at = NOW()`);
     vals.push(req.params.id, req.userId);
     await pool.query(`UPDATE listings SET ${sets.join(', ')} WHERE id = $${idx++} AND seller_id = $${idx}`, vals);
+    auditLog('update_listing', { adminId: req.userId, entityType: 'listing', entityId: req.params.id, details: 'Listing updated', ipAddress: req.ip });
     res.json({ ok: true });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
@@ -131,6 +135,7 @@ router.put('/:id', authMiddleware, async (req: AuthRequest, res) => {
 router.delete('/:id', authMiddleware, async (req: AuthRequest, res) => {
   try {
     await pool.query('DELETE FROM listings WHERE id = $1 AND seller_id = $2', [req.params.id, req.userId]);
+    auditLog('delete_listing', { adminId: req.userId, entityType: 'listing', entityId: req.params.id, details: 'Listing deleted', ipAddress: req.ip });
     res.json({ ok: true });
   } catch (err: any) {
     res.status(500).json({ error: err.message });

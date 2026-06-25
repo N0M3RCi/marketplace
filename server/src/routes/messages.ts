@@ -2,6 +2,9 @@ import { Router } from 'express';
 import pool from '../db.js';
 import type { AuthRequest } from '../middleware/auth.js';
 import { sanitizeText } from '../middleware/sanitizer.js';
+import { validate } from '../middleware/validate.js';
+import * as messageSchemas from '../schemas/messages.js';
+import { auditLog } from '../middleware/auditLogger.js';
 import { v4 as uuid } from 'uuid';
 
 const router = Router();
@@ -45,7 +48,7 @@ router.get('/:conversationId', async (req: AuthRequest, res) => {
 });
 
 // POST /api/messages
-router.post('/', async (req: AuthRequest, res) => {
+router.post('/', validate(messageSchemas.sendMessage), async (req: AuthRequest, res) => {
   try {
     const { conversationId, content, isBuyer, imageUrl, fileUrl, fileName, fileSize } = req.body;
     if (!conversationId || !content?.trim()) {
@@ -73,6 +76,7 @@ router.post('/', async (req: AuthRequest, res) => {
 
     const user = await pool.query('SELECT username FROM user_profiles WHERE id = $1', [req.userId]);
     const m = result.rows[0];
+    auditLog('send_message', { adminId: req.userId, entityType: 'message', entityId: m.id, details: `Message sent in conversation ${conversationId}`, ipAddress: req.ip });
     res.status(201).json({
       id: m.id, conversationId: m.conversation_id, senderId: m.sender_id,
       senderName: user.rows[0]?.username || 'Unknown', content: m.content,

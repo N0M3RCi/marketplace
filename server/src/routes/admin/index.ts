@@ -1,8 +1,10 @@
 import { Router } from 'express';
+import argon2 from 'argon2';
 import bcryptjs from 'bcryptjs';
 import { adminOnly } from '../../middleware/auth.js';
 import type { AuthRequest } from '../../middleware/auth.js';
 import pool from '../../db.js';
+import { auditLog } from '../../middleware/auditLogger.js';
 import { v4 as uuid } from 'uuid';
 
 const router = Router();
@@ -26,6 +28,7 @@ router.get('/users', async (_req: AuthRequest, res) => {
 router.put('/users/:id/role', async (req: AuthRequest, res) => {
   try {
     await pool.query('UPDATE user_profiles SET role = $1 WHERE id = $2', [req.body.role, req.params.id]);
+    auditLog('change_user_role', { adminId: req.userId, entityType: 'user', entityId: req.params.id, details: `Role changed to ${req.body.role}`, ipAddress: req.ip });
     res.json({ ok: true });
   } catch (err: any) { res.status(500).json({ error: err.message }); }
 });
@@ -35,6 +38,7 @@ router.put('/users/:id/profile', async (req: AuthRequest, res) => {
     const { username, email, avatar_url, role, phone } = req.body;
     await pool.query('UPDATE user_profiles SET username=COALESCE($1,username), email=COALESCE($2,email), avatar_url=COALESCE($3,avatar_url), role=COALESCE($4,role), phone=COALESCE($5,phone), updated_at=NOW() WHERE id=$6',
       [username, email, avatar_url, role, phone, req.params.id]);
+    auditLog('edit_user', { adminId: req.userId, entityType: 'user', entityId: req.params.id, details: 'User profile edited by admin', ipAddress: req.ip });
     res.json({ ok: true });
   } catch (err: any) { res.status(500).json({ error: err.message }); }
 });
@@ -43,6 +47,7 @@ router.put('/users/:id/status', async (req: AuthRequest, res) => {
   try {
     await pool.query('UPDATE user_profiles SET status=$1, is_active=$2 WHERE id=$3',
       [req.body.status, req.body.is_active, req.params.id]);
+    auditLog('change_user_status', { adminId: req.userId, entityType: 'user', entityId: req.params.id, details: `Status changed to ${req.body.status}, active: ${req.body.is_active}`, ipAddress: req.ip });
     res.json({ ok: true });
   } catch (err: any) { res.status(500).json({ error: err.message }); }
 });
@@ -52,6 +57,7 @@ router.put('/users/:id/verify', async (req: AuthRequest, res) => {
     const curr = await pool.query('SELECT is_verified FROM user_profiles WHERE id=$1', [req.params.id]);
     const newVal = !curr.rows[0]?.is_verified;
     await pool.query('UPDATE user_profiles SET is_verified=$1 WHERE id=$2', [newVal, req.params.id]);
+    auditLog('toggle_verification', { adminId: req.userId, entityType: 'user', entityId: req.params.id, details: `Verification toggled to ${newVal}`, ipAddress: req.ip });
     res.json({ is_verified: newVal });
   } catch (err: any) { res.status(500).json({ error: err.message }); }
 });
@@ -69,6 +75,7 @@ router.put('/users/:id', async (req: AuthRequest, res) => {
       updated_at = NOW()
       WHERE id = $7`,
       [username, role, status, phone, is_verified, is_active, req.params.id]);
+    auditLog('edit_user_admin', { adminId: req.userId, entityType: 'user', entityId: req.params.id, details: 'User edited via admin panel', ipAddress: req.ip });
     res.json({ ok: true });
   } catch (err: any) { res.status(500).json({ error: err.message }); }
 });
@@ -85,7 +92,7 @@ router.post('/users', async (req: AuthRequest, res) => {
       res.status(409).json({ error: 'Email already registered' });
       return;
     }
-    const hash = await bcryptjs.hash(password, 10);
+    const hash = await argon2.hash(password);
     const id = uuid();
     const userRole = role || 'buyer';
     await pool.query(
@@ -95,6 +102,7 @@ router.post('/users', async (req: AuthRequest, res) => {
     try {
       await pool.query('INSERT INTO wallets (user_id, balance, pending_balance, currency) VALUES ($1, 0, 0, $2)', [id, 'USD']);
     } catch {}
+    auditLog('create_user_admin', { adminId: req.userId, entityType: 'user', entityId: id, details: `Admin created user: ${email}`, ipAddress: req.ip });
     res.status(201).json({ id, email, username, role: userRole });
   } catch (err: any) { res.status(500).json({ error: err.message }); }
 });
@@ -146,6 +154,7 @@ router.delete('/users/:id', async (req: AuthRequest, res) => {
     // Delete the user
     await pool.query('DELETE FROM user_profiles WHERE id = $1::uuid', [id]);
 
+    auditLog('delete_user', { adminId: req.userId, entityType: 'user', entityId: req.params.id, details: 'User deleted by admin', ipAddress: req.ip });
     res.json({ ok: true });
   } catch (err: any) { res.status(500).json({ error: err.message }); }
 });
@@ -169,6 +178,7 @@ router.put('/seller-requests/:id/approve', async (req: AuthRequest, res) => {
       ['seller', 'both', 'seller', r.user_id]);
     await pool.query("UPDATE seller_requests SET status='approved', reviewed_by=$1, reviewed_at=NOW() WHERE id=$2",
       [req.userId, req.params.id]);
+    auditLog('approve_seller_request', { adminId: req.userId, entityType: 'seller_request', entityId: req.params.id, details: `Seller request approved for user ${r.user_id}`, ipAddress: req.ip });
     res.json({ ok: true });
   } catch (err: any) { res.status(500).json({ error: err.message }); }
 });
@@ -177,6 +187,7 @@ router.put('/seller-requests/:id/reject', async (req: AuthRequest, res) => {
   try {
     await pool.query("UPDATE seller_requests SET status='rejected', reviewed_by=$1, reviewed_at=NOW(), admin_notes=$2 WHERE id=$3",
       [req.userId, req.body.notes || '', req.params.id]);
+    auditLog('deny_seller_request', { adminId: req.userId, entityType: 'seller_request', entityId: req.params.id, details: 'Seller request rejected', ipAddress: req.ip });
     res.json({ ok: true });
   } catch (err: any) { res.status(500).json({ error: err.message }); }
 });
@@ -213,6 +224,7 @@ router.put('/escrow/:id/delivery-status', async (req: AuthRequest, res) => {
         [escrow.seller_id, delivery_status === 'delivered' ? 'delivered' : 'delivery_started', `Delivery ${delivery_status === 'delivered' ? 'Delivered' : 'Updated'}`, buyerNotif, req.params.id]);
     }
 
+    auditLog('update_delivery_status', { adminId: req.userId, entityType: 'escrow', entityId: req.params.id, details: `Delivery status updated to ${delivery_status}`, ipAddress: req.ip });
     res.json({ ok: true, delivery_status });
   } catch (err: any) { res.status(500).json({ error: err.message }); }
 });
@@ -249,6 +261,7 @@ router.put('/listings/:id', async (req: AuthRequest, res) => {
     if (sets.length === 1) { res.json({ ok: true }); return; }
     vals.push(req.params.id);
     await pool.query(`UPDATE listings SET ${sets.join(', ')} WHERE id = $${idx}`, vals);
+    auditLog('admin_edit_listing', { adminId: req.userId, entityType: 'listing', entityId: req.params.id, details: 'Listing edited by admin', ipAddress: req.ip });
     res.json({ ok: true });
   } catch (err: any) { res.status(500).json({ error: err.message }); }
 });
@@ -256,6 +269,7 @@ router.put('/listings/:id', async (req: AuthRequest, res) => {
 router.delete('/listings/:id', async (req: AuthRequest, res) => {
   try {
     await pool.query('DELETE FROM listings WHERE id=$1', [req.params.id]);
+    auditLog('admin_delete_listing', { adminId: req.userId, entityType: 'listing', entityId: req.params.id, details: 'Listing deleted by admin', ipAddress: req.ip });
     res.json({ ok: true });
   } catch (err: any) { res.status(500).json({ error: err.message }); }
 });
@@ -290,6 +304,7 @@ router.put('/escrow/:id', async (req: AuthRequest, res) => {
     for (const f of allowed) { if (req.body[f] !== undefined) { sets.push(`${f} = $${idx++}`); vals.push(req.body[f]); } }
     vals.push(req.params.id);
     await pool.query(`UPDATE escrow_cases SET ${sets.join(',')} WHERE id=$${idx}`, vals);
+    auditLog('admin_update_escrow', { adminId: req.userId, entityType: 'escrow', entityId: req.params.id, details: 'Escrow updated by admin', ipAddress: req.ip });
     res.json({ ok: true });
   } catch (err: any) { res.status(500).json({ error: err.message }); }
 });
@@ -302,6 +317,7 @@ router.delete('/escrow/:id', async (req: AuthRequest, res) => {
     await pool.query('DELETE FROM notifications WHERE case_id = $1', [req.params.id]);
     // Delete the escrow case
     await pool.query('DELETE FROM escrow_cases WHERE id = $1', [req.params.id]);
+    auditLog('admin_delete_escrow', { adminId: req.userId, entityType: 'escrow', entityId: req.params.id, details: 'Escrow deleted by admin', ipAddress: req.ip });
     res.json({ ok: true });
   } catch (err: any) { res.status(500).json({ error: err.message }); }
 });
@@ -318,6 +334,7 @@ router.put('/wallets/:id', async (req: AuthRequest, res) => {
   try {
     await pool.query('UPDATE wallets SET balance=$1, pending_balance=$2, updated_at=NOW() WHERE id=$3',
       [req.body.balance, req.body.pending_balance, req.params.id]);
+    auditLog('wallet_update', { adminId: req.userId, entityType: 'wallet', entityId: req.params.id, details: `Wallet updated: balance=${req.body.balance}, pending=${req.body.pending_balance}`, ipAddress: req.ip });
     res.json({ ok: true });
   } catch (err: any) { res.status(500).json({ error: err.message }); }
 });
@@ -367,6 +384,7 @@ router.post('/payouts', async (req: AuthRequest, res) => {
       [id, caseId, sellerId, amount, fees || 0, netAmount || amount, currency || 'USD']);
     await pool.query("UPDATE escrow_cases SET payout_status='pending', updated_at=NOW() WHERE id=$1", [caseId]);
     await pool.query(`INSERT INTO escrow_timeline (case_id, status, label, actor_name) VALUES ($1,'funds_released','Payout created','Admin')`, [caseId]);
+    auditLog('create_payout', { adminId: req.userId, entityType: 'payout', entityId: id, details: `Payout created for case ${caseId}`, ipAddress: req.ip });
     res.status(201).json({ id });
   } catch (err: any) { res.status(500).json({ error: err.message }); }
 });
@@ -375,6 +393,7 @@ router.put('/payouts/:id', async (req: AuthRequest, res) => {
   try {
     await pool.query('UPDATE payouts SET status=$1, approved_by=$2, notes=$3, paid_at=NOW() WHERE id=$4',
       [req.body.status, req.body.approved_by || 'Admin', req.body.notes || '', req.params.id]);
+    auditLog('update_payout', { adminId: req.userId, entityType: 'payout', entityId: req.params.id, details: `Payout status updated to ${req.body.status}`, ipAddress: req.ip });
     res.json({ ok: true });
   } catch (err: any) { res.status(500).json({ error: err.message }); }
 });
@@ -448,6 +467,7 @@ router.post('/payment-settings', async (req: AuthRequest, res) => {
       'INSERT INTO payment_settings (method, crypto_address, crypto_network, instructions, qr_code_url, icon_url) VALUES ($1,$2,$3,$4,$5,$6)',
       [method || 'crypto', crypto_address, crypto_network, instructions || null, qr_code_url || null, icon_url || null]
     );
+    auditLog('create_payment_setting', { adminId: req.userId, entityType: 'payment_setting', details: `Payment setting created: ${req.body.method || ''}`, ipAddress: req.ip });
     res.status(201).json({ ok: true });
   } catch (err: any) { res.status(500).json({ error: err.message }); }
 });
@@ -459,6 +479,7 @@ router.put('/payment-settings/:id', async (req: AuthRequest, res) => {
       `UPDATE payment_settings SET method=COALESCE($1,method), crypto_address=$2, crypto_network=$3, instructions=$4, qr_code_url=$5, is_active=$6, icon_url=$7, updated_at=NOW() WHERE id=$8`,
       [method || null, crypto_address, crypto_network, instructions || null, qr_code_url || null, is_active !== undefined ? is_active : true, icon_url || null, req.params.id]
     );
+    auditLog('update_payment_setting', { adminId: req.userId, entityType: 'payment_setting', entityId: req.params.id, details: 'Payment setting updated', ipAddress: req.ip });
     res.json({ ok: true });
   } catch (err: any) { res.status(500).json({ error: err.message }); }
 });
@@ -466,6 +487,7 @@ router.put('/payment-settings/:id', async (req: AuthRequest, res) => {
 router.delete('/payment-settings/:id', async (req: AuthRequest, res) => {
   try {
     await pool.query('DELETE FROM payment_settings WHERE id=$1', [req.params.id]);
+    auditLog('delete_payment_setting', { adminId: req.userId, entityType: 'payment_setting', entityId: req.params.id, details: 'Payment setting deleted', ipAddress: req.ip });
     res.json({ ok: true });
   } catch (err: any) { res.status(500).json({ error: err.message }); }
 });
@@ -496,6 +518,7 @@ router.post('/messages', async (req: AuthRequest, res) => {
     await pool.query(
       'UPDATE conversations SET last_message=$1, last_message_at=NOW(), updated_at=NOW() WHERE id=$2',
       [content.substring(0, 100), conversationId]);
+    auditLog('admin_send_message', { adminId: req.userId, entityType: 'message', entityId: id, details: `Admin sent message in conversation ${conversationId}`, ipAddress: req.ip });
     const user = await pool.query('SELECT username FROM user_profiles WHERE id=$1', [senderId]);
     res.status(201).json({
       id, conversationId, senderId,
@@ -569,6 +592,7 @@ router.post('/categories', async (req: AuthRequest, res) => {
     await pool.query(
       'INSERT INTO categories (id, name, slug, icon, color, parent_id) VALUES ($1,$2,$3,$4,$5,$6)',
       [id, name.trim(), finalSlug, icon || 'Tag', color || 'text-gray-600', parent_id || null]);
+    auditLog('create_category', { adminId: req.userId, entityType: 'category', entityId: id, details: `Category created: ${name}`, ipAddress: req.ip });
     res.status(201).json({ id });
   } catch (err: any) { res.status(500).json({ error: err.message }); }
 });
@@ -586,6 +610,7 @@ router.put('/categories/:id', async (req: AuthRequest, res) => {
     if (sets.length === 0) { res.json({ ok: true }); return; }
     vals.push(req.params.id);
     await pool.query(`UPDATE categories SET ${sets.join(', ')} WHERE id = $${idx}`, vals);
+    auditLog('update_category', { adminId: req.userId, entityType: 'category', entityId: req.params.id, details: 'Category updated', ipAddress: req.ip });
     res.json({ ok: true });
   } catch (err: any) { res.status(500).json({ error: err.message }); }
 });
@@ -595,6 +620,7 @@ router.put('/categories/:id/homepage-featured', async (req: AuthRequest, res) =>
     const { featured } = req.body;
     if (featured === undefined) { res.status(400).json({ error: 'featured field is required' }); return; }
     await pool.query('UPDATE categories SET homepage_featured = $1 WHERE id = $2', [featured, req.params.id]);
+    auditLog('toggle_category_featured', { adminId: req.userId, entityType: 'category', entityId: req.params.id, details: `Homepage featured toggled to ${featured}`, ipAddress: req.ip });
     res.json({ ok: true });
   } catch (err: any) { res.status(500).json({ error: err.message }); }
 });
@@ -614,6 +640,7 @@ router.delete('/categories/:id', async (req: AuthRequest, res) => {
       return;
     }
     await pool.query('DELETE FROM categories WHERE id = $1', [req.params.id]);
+    auditLog('delete_category', { adminId: req.userId, entityType: 'category', entityId: req.params.id, details: 'Category deleted', ipAddress: req.ip });
     res.json({ ok: true });
   } catch (err: any) { res.status(500).json({ error: err.message }); }
 });
@@ -665,6 +692,7 @@ router.post('/featured-listings', async (req: AuthRequest, res) => {
     await pool.query(
       'INSERT INTO featured_listings (id, listing_id, sort_order, added_by) VALUES ($1,$2,$3,$4)',
       [id, listing_id, maxOrder.rows[0].next, req.userId]);
+    auditLog('add_featured_listing', { adminId: req.userId, entityType: 'featured_listing', entityId: id, details: `Listing ${listing_id} added to featured`, ipAddress: req.ip });
     res.status(201).json({ id });
   } catch (err: any) { res.status(500).json({ error: err.message }); }
 });
@@ -672,6 +700,7 @@ router.post('/featured-listings', async (req: AuthRequest, res) => {
 router.delete('/featured-listings/:id', async (req: AuthRequest, res) => {
   try {
     await pool.query('DELETE FROM featured_listings WHERE id = $1', [req.params.id]);
+    auditLog('remove_featured_listing', { adminId: req.userId, entityType: 'featured_listing', entityId: req.params.id, details: 'Featured listing removed', ipAddress: req.ip });
     res.json({ ok: true });
   } catch (err: any) { res.status(500).json({ error: err.message }); }
 });

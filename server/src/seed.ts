@@ -1,9 +1,9 @@
 import pool from './db.js';
-import bcryptjs from 'bcryptjs';
+import argon2 from 'argon2';
 import { v4 as uuid } from 'uuid';
 
 async function seed() {
-  const hash = await bcryptjs.hash('password123', 10);
+  const hash = await argon2.hash('password123');
 
   // Users
   const adminId = uuid();

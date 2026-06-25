@@ -1,26 +1,26 @@
 import { Router } from 'express';
+import argon2 from 'argon2';
 import bcryptjs from 'bcryptjs';
 import pool, { queryWithRetry } from '../db.js';
 import { generateToken, authMiddleware } from '../middleware/auth.js';
 import type { AuthRequest } from '../middleware/auth.js';
+import { validate } from '../middleware/validate.js';
+import * as authSchemas from '../schemas/auth.js';
+import { auditLog } from '../middleware/auditLogger.js';
 import { v4 as uuid } from 'uuid';
 
 const router = Router();
 
 // POST /api/auth/register
-router.post('/register', async (req, res) => {
+router.post('/register', validate(authSchemas.register), async (req, res) => {
   try {
     const { email, password, username } = req.body;
-    if (!email || !password || !username) {
-      res.status(400).json({ error: 'Email, password, and username required' });
-      return;
-    }
     const existing = await queryWithRetry('SELECT id FROM user_profiles WHERE email = $1', [email]);
     if (existing.rows.length > 0) {
       res.status(409).json({ error: 'Email already registered' });
       return;
     }
-    const hash = await bcryptjs.hash(password, 10);
+    const hash = await argon2.hash(password);
     const id = uuid();
     await queryWithRetry(
       'INSERT INTO user_profiles (id, email, username, password_hash, role) VALUES ($1,$2,$3,$4,$5)',
@@ -32,6 +32,7 @@ router.post('/register', async (req, res) => {
     } catch (walletErr) {
       console.warn('Could not create wallet for new user:', walletErr);
     }
+    auditLog('register', { entityType: 'user', entityId: id, details: `User registered: ${email}`, ipAddress: req.ip });
     const token = generateToken(id, 'buyer');
     res.status(201).json({ token, user: { id, email, username, role: 'buyer', avatar: null } });
   } catch (err: any) {
@@ -41,13 +42,9 @@ router.post('/register', async (req, res) => {
 });
 
 // POST /api/auth/login
-router.post('/login', async (req, res) => {
+router.post('/login', validate(authSchemas.login), async (req, res) => {
   try {
     const { email, password } = req.body;
-    if (!email || !password) {
-      res.status(400).json({ error: 'Email and password required' });
-      return;
-    }
     // Use queryWithRetry for resilience against transient DB failures
     const result = await queryWithRetry(
       'SELECT id, email, username, password_hash, role, avatar_url FROM user_profiles WHERE email = $1 AND is_active = true',
@@ -59,10 +56,21 @@ router.post('/login', async (req, res) => {
     }
     const user = result.rows[0];
     let valid = false;
+    const passwordHash = user.password_hash;
+    const isBcrypt = passwordHash.startsWith('$2a$') || passwordHash.startsWith('$2b$');
     try {
-      valid = await bcryptjs.compare(password, user.password_hash);
-    } catch (bcErr) {
-      console.error('bcryptjs compare error:', bcErr);
+      if (isBcrypt) {
+        // Legacy bcrypt hash — verify with bcryptjs, then upgrade to argon2
+        valid = await bcryptjs.compare(password, passwordHash);
+        if (valid) {
+          const upgradedHash = await argon2.hash(password);
+          await queryWithRetry('UPDATE user_profiles SET password_hash = $1 WHERE id = $2', [upgradedHash, user.id]);
+        }
+      } else {
+        valid = await argon2.verify(passwordHash, password);
+      }
+    } catch (authErr) {
+      console.error('Password verification error:', authErr);
       res.status(500).json({ error: 'Authentication error, please try again' });
       return;
     }
@@ -70,6 +78,7 @@ router.post('/login', async (req, res) => {
       res.status(401).json({ error: 'Invalid credentials' });
       return;
     }
+    auditLog('login', { adminId: user.id, adminName: user.username, entityType: 'user', entityId: user.id, details: `User logged in: ${user.email}`, ipAddress: req.ip });
     const token = generateToken(user.id, user.role);
     res.json({ token, user: { id: user.id, email: user.email, username: user.username, role: user.role, avatar: user.avatar_url } });
   } catch (err: any) {
@@ -101,7 +110,7 @@ router.get('/me', authMiddleware, async (req: AuthRequest, res) => {
 });
 
 // PUT /api/auth/profile
-router.put('/profile', authMiddleware, async (req: AuthRequest, res) => {
+router.put('/profile', authMiddleware, validate(authSchemas.updateProfile), async (req: AuthRequest, res) => {
   try {
     const { username, phone, avatar_url } = req.body;
     const updates: string[] = [];
@@ -122,15 +131,22 @@ router.put('/profile', authMiddleware, async (req: AuthRequest, res) => {
 });
 
 // PUT /api/auth/password
-router.put('/password', authMiddleware, async (req: AuthRequest, res) => {
+router.put('/password', authMiddleware, validate(authSchemas.changePassword), async (req: AuthRequest, res) => {
   try {
     const { currentPassword, newPassword } = req.body;
     const result = await pool.query('SELECT password_hash FROM user_profiles WHERE id = $1', [req.userId]);
     if (result.rows.length === 0) { res.status(404).json({ error: 'User not found' }); return; }
-    const valid = await bcryptjs.compare(currentPassword, result.rows[0].password_hash);
+    const currentHash = result.rows[0].password_hash;
+    let valid = false;
+    if (currentHash.startsWith('$2a$') || currentHash.startsWith('$2b$')) {
+      valid = await bcryptjs.compare(currentPassword, currentHash);
+    } else {
+      valid = await argon2.verify(currentHash, currentPassword);
+    }
     if (!valid) { res.status(400).json({ error: 'Current password is incorrect' }); return; }
-    const hash = await bcryptjs.hash(newPassword, 10);
+    const hash = await argon2.hash(newPassword);
     await pool.query('UPDATE user_profiles SET password_hash = $1 WHERE id = $2', [hash, req.userId]);
+    auditLog('change_password', { adminId: req.userId, entityType: 'user', entityId: req.userId, details: 'Password changed', ipAddress: req.ip });
     res.json({ ok: true });
   } catch (err: any) {
     res.status(500).json({ error: err.message });

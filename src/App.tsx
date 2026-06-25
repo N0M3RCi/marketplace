@@ -1,40 +1,42 @@
+import { lazy, Suspense } from "react";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AuthProvider } from "@/hooks/useAuth";
-import Index from "./pages/Index";
-import NotFound from "./pages/NotFound";
-import Login from "./pages/Login";
-import Dashboard from "./pages/Dashboard";
-import Marketplace from "./pages/Marketplace";
-import ListingDetail from "./pages/ListingDetail";
-import Messages from "./pages/Messages";
-import EscrowCaseDetail from "./pages/EscrowCaseDetail";
-import AdminLayout from "./pages/admin/AdminLayout";
-import AdminDashboard from "./pages/admin/AdminDashboard";
-import EscrowCases from "./pages/admin/EscrowCases";
-import AdminEscrowCaseDetail from "./pages/admin/AdminEscrowCaseDetail";
-import PaymentReview from "./pages/admin/PaymentReview";
-import SellerVerification from "./pages/admin/SellerVerification";
-import DeliveryManagement from "./pages/admin/DeliveryManagement";
-import Disputes from "./pages/admin/Disputes";
-import Payouts from "./pages/admin/Payouts";
-import Analytics from "./pages/admin/Analytics";
-import AdminUsers from "./pages/admin/Users";
-import AuditLogs from "./pages/admin/AuditLogs";
-import CreateListing from "./pages/CreateListing";
-import BulkUpload from "./pages/BulkUpload";
-import Wallet from "./pages/Wallet";
-import PaymentSettings from "./pages/admin/PaymentSettings";
-import AdminListings from "./pages/admin/Listings";
-import AdminMessages from "./pages/admin/AdminMessages";
-import AdminWallets from "./pages/admin/Wallets";
-import AdminCategories from "./pages/admin/Categories";
-import AdminHomepageCategories from "./pages/admin/HomepageCategories";
-import AdminFeaturedListings from "./pages/admin/FeaturedListings";
-import Profile from "./pages/Profile";
+
+const Index = lazy(() => import("./pages/Index"));
+const NotFound = lazy(() => import("./pages/NotFound"));
+const Login = lazy(() => import("./pages/Login"));
+const Dashboard = lazy(() => import("./pages/Dashboard"));
+const Marketplace = lazy(() => import("./pages/Marketplace"));
+const ListingDetail = lazy(() => import("./pages/ListingDetail"));
+const Messages = lazy(() => import("./pages/Messages"));
+const EscrowCaseDetail = lazy(() => import("./pages/EscrowCaseDetail"));
+const AdminLayout = lazy(() => import("./pages/admin/AdminLayout"));
+const AdminDashboard = lazy(() => import("./pages/admin/AdminDashboard"));
+const EscrowCases = lazy(() => import("./pages/admin/EscrowCases"));
+const AdminEscrowCaseDetail = lazy(() => import("./pages/admin/AdminEscrowCaseDetail"));
+const PaymentReview = lazy(() => import("./pages/admin/PaymentReview"));
+const SellerVerification = lazy(() => import("./pages/admin/SellerVerification"));
+const DeliveryManagement = lazy(() => import("./pages/admin/DeliveryManagement"));
+const Disputes = lazy(() => import("./pages/admin/Disputes"));
+const Payouts = lazy(() => import("./pages/admin/Payouts"));
+const Analytics = lazy(() => import("./pages/admin/Analytics"));
+const AdminUsers = lazy(() => import("./pages/admin/Users"));
+const AuditLogs = lazy(() => import("./pages/admin/AuditLogs"));
+const CreateListing = lazy(() => import("./pages/CreateListing"));
+const BulkUpload = lazy(() => import("./pages/BulkUpload"));
+const Wallet = lazy(() => import("./pages/Wallet"));
+const PaymentSettings = lazy(() => import("./pages/admin/PaymentSettings"));
+const AdminListings = lazy(() => import("./pages/admin/Listings"));
+const AdminMessages = lazy(() => import("./pages/admin/AdminMessages"));
+const AdminWallets = lazy(() => import("./pages/admin/Wallets"));
+const AdminCategories = lazy(() => import("./pages/admin/Categories"));
+const AdminHomepageCategories = lazy(() => import("./pages/admin/HomepageCategories"));
+const AdminFeaturedListings = lazy(() => import("./pages/admin/FeaturedListings"));
+const Profile = lazy(() => import("./pages/Profile"));
 
 const queryClient = new QueryClient();
 
@@ -45,6 +47,14 @@ const App = () => (
       <Sonner />
       <BrowserRouter>
         <AuthProvider>
+          <Suspense fallback={
+            <div className="min-h-screen flex items-center justify-center" style={{ background: '#FFFDF5' }}>
+              <div className="flex flex-col items-center gap-3">
+                <div className="w-8 h-8 rounded-full border-2 border-t-transparent animate-spin" style={{ borderColor: '#E8A800', borderTopColor: 'transparent' }} />
+                <p className="text-sm font-medium" style={{ color: '#9A7C40' }}>Loading...</p>
+              </div>
+            </div>
+          }>
           <Routes>
             {/* Public Routes */}
             <Route path="/" element={<Index />} />
@@ -86,6 +96,7 @@ const App = () => (
 
             <Route path="*" element={<NotFound />} />
           </Routes>
+          </Suspense>
         </AuthProvider>
       </BrowserRouter>
     </TooltipProvider>
