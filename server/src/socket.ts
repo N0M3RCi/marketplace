@@ -1,18 +1,21 @@
 import { Server as HTTPServer } from 'http';
 import { Server } from 'socket.io';
 import jwt from 'jsonwebtoken';
+import crypto from 'crypto';
 import pool from './db.js';
 import { sanitizeText } from './middleware/sanitizer.js';
 
 function getJwtSecret(): string {
   const secret = process.env.JWT_SECRET;
   if (!secret) {
+    const generated = crypto.randomBytes(32).toString('hex');
     console.warn(
       'WARNING: JWT_SECRET environment variable is not set. ' +
-      'Using a hardcoded fallback is INSECURE for production. ' +
+      'Using a randomly generated secret for this session. ' +
+      'ALL EXISTING TOKENS WILL BE INVALIDATED on restart. ' +
       'Set JWT_SECRET in your environment (e.g. openssl rand -hex 32).'
     );
-    return 'safeescrow-dev-secret-key-change-in-production';
+    return generated;
   }
   return secret;
 }
@@ -93,6 +96,12 @@ export function setupSocket(httpServer: HTTPServer) {
       } catch (err) {
         socket.emit('error', 'Failed to join conversation');
       }
+    });
+
+    // Leave conversation room
+    socket.on('leave:conversation', (conversationId: string) => {
+      socket.leave(`conv:${conversationId}`);
+      console.log(`${user.username} left conversation ${conversationId}`);
     });
 
     // Send message

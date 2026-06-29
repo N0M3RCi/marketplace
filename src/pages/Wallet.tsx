@@ -72,15 +72,14 @@ export default function Wallet() {
 
   const fetchCryptoAddresses = useCallback(async () => {
     const { data } = await supabase
-      .from('payment_settings')
-      .select('currency, crypto_address, crypto_network, instructions')
-      .eq('is_active', true)
-      .in('currency', ['BTC', 'USDT', 'USDC']);
+      .from('payment_addresses')
+      .select('cryptoAddress, cryptoNetwork, instructions')
+      .eq('isActive', true);
     if (data && data.length > 0) {
       setCryptoAddresses(data.map((r: any) => ({
-        currency: r.currency,
-        address: r.crypto_address,
-        network: r.crypto_network,
+        currency: r.method === 'crypto' ? (r.cryptoAddress?.startsWith('1') || r.cryptoAddress?.startsWith('3') || r.cryptoAddress?.startsWith('bc1') ? 'BTC' : 'USDT') : 'USDC',
+        address: r.cryptoAddress,
+        network: r.cryptoNetwork,
         instructions: r.instructions || '',
       })));
     }

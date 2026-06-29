@@ -34,17 +34,17 @@ export async function createListing(listing: Partial<Listing> & { sellerId: stri
 }
 
 // ─── Favorites ────────────────────────────────────────────────
-export async function toggleFavorite(listingId: string, userId: string): Promise<boolean> {
+export async function toggleFavorite(listingId: string): Promise<boolean> {
   const result = await client.favorites.toggle(listingId);
   return result.favorited;
 }
 
-export async function fetchFavorites(userId: string): Promise<string[]> {
+export async function fetchFavorites(): Promise<string[]> {
   return client.favorites.list();
 }
 
 // ─── Conversations ────────────────────────────────────────────
-export async function fetchConversations(userId: string): Promise<Conversation[]> {
+export async function fetchConversations(): Promise<Conversation[]> {
   return client.conversations.list();
 }
 
@@ -72,12 +72,12 @@ export async function sendMessage(
   return client.messages.send(conversationId, content, isBuyer);
 }
 
-export async function markConversationRead(conversationId: string, userId: string, isBuyer: boolean) {
+export async function markConversationRead(conversationId: string, isBuyer: boolean) {
   return client.conversations.markRead(conversationId, isBuyer);
 }
 
 // ─── Notifications ────────────────────────────────────────────
-export async function fetchNotifications(userId: string) {
+export async function fetchNotifications() {
   return client.notifications.list(30);
 }
 

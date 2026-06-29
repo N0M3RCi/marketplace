@@ -36,7 +36,7 @@ export function useSocket(options: UseSocketOptions) {
 
   const socketRef = useRef<Socket | null>(null);
   const prevConversationIdRef = useRef<string | null | undefined>(null);
-  const typingTimersRef = useRef<Map<string, NodeJS.Timeout>>(new Map());
+  const typingTimersRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
   const [connected, setConnected] = useState(false);
   const [typingUsers, setTypingUsers] = useState<Record<string, { username: string }>>({});
   const onNewMessageRef = useRef(onNewMessage);

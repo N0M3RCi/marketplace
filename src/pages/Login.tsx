@@ -40,6 +40,7 @@ export default function Login() {
       const authUser = mapSupabaseUser(user);
       toast.success(`Welcome back, ${authUser.username}!`);
       await refresh();
+      setLoginLoading(false);
       if (authUser.role === 'admin') navigate('/admin');
       else navigate('/dashboard');
     } catch (err: any) {
@@ -57,6 +58,7 @@ export default function Login() {
       localStorage.setItem('auth_token', result.token);
       toast.success(`Welcome to SafeEscrow, ${result.user.username}!`);
       await refresh();
+      setRegLoading(false);
       navigate('/dashboard');
     } catch (err: any) {
       toast.error(err.message || 'Registration failed');

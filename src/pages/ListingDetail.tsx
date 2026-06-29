@@ -87,7 +87,7 @@ export default function ListingDetail() {
     if (!user) { navigate('/login'); return; }
     setIsFav(!isFav);
     try {
-      await toggleFavorite(listing!.id, user.id);
+      await toggleFavorite(listing!.id);
     } catch {
       setIsFav(isFav);
     }

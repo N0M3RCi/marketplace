@@ -138,23 +138,28 @@ export default function CreateListing() {
     if (!user) { navigate('/login'); return; }
     setSubmitting(true);
 
-    const imagePublicUrls = await uploadImages();
+    try {
+      const imagePublicUrls = await uploadImages();
 
-    const listing = await createListing({
-      title: form.title.trim(),
-      description: form.description.trim(),
-      categoryId: form.categoryId,
-      condition: form.condition as any,
-      location: form.location.trim(),
-      price: Number(form.price),
-      currency: form.currency,
-      images: imagePublicUrls,
-      sellerId: selectedSellerId || user.id,
-    });
+      const listing = await createListing({
+        title: form.title.trim(),
+        description: form.description.trim(),
+        categoryId: form.categoryId,
+        condition: form.condition as any,
+        location: form.location.trim(),
+        price: Number(form.price),
+        currency: form.currency,
+        images: imagePublicUrls,
+        sellerId: selectedSellerId || user.id,
+      });
 
-    toast.success('Listing published successfully!');
-    navigate(`/listing/${listing.id}`);
-    setSubmitting(false);
+      toast.success('Listing published successfully!');
+      navigate(`/listing/${listing.id}`);
+    } catch (err: any) {
+      toast.error(err?.message || 'Failed to publish listing. Please try again.');
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   if (!user) {

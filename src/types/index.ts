@@ -38,7 +38,7 @@ export interface Listing {
   sellerName: string;
   sellerRating: number;
   images: string[];
-  condition: 'new' | 'like-new' | 'good' | 'fair';
+  condition: 'new' | 'like-new' | 'good' | 'fair' | 'poor';
   location: string;
   status: 'active' | 'sold' | 'pending' | 'suspended';
   createdAt: string;

@@ -1,15 +1,18 @@
 import jwt from 'jsonwebtoken';
+import crypto from 'crypto';
 import type { Request, Response, NextFunction } from 'express';
 
 function getJwtSecret(): string {
   const secret = process.env.JWT_SECRET;
   if (!secret) {
+    const generated = crypto.randomBytes(32).toString('hex');
     console.warn(
       'WARNING: JWT_SECRET environment variable is not set. ' +
-      'Using a hardcoded fallback is INSECURE for production. ' +
+      'Using a randomly generated secret for this session. ' +
+      'ALL EXISTING TOKENS WILL BE INVALIDATED on restart. ' +
       'Set JWT_SECRET in your environment (e.g. openssl rand -hex 32).'
     );
-    return 'safeescrow-dev-secret-key-change-in-production';
+    return generated;
   }
   return secret;
 }

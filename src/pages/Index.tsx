@@ -1,40 +1,16 @@
-import { useState, useRef, useEffect } from 'react';
-import { useCountUp } from '@/hooks/useCountUp';
+import { useState, useEffect } from 'react';
 import {
   TrendingUp, ShieldCheck, Users, ArrowRight, Star, ChevronRight,
   Lock, Zap, Eye, BadgeCheck, Package, CheckCircle2, Clock,
   Banknote, Truck, MessageSquare, Award, Activity,
   UserPlus, Search, FileCheck, Send, Camera, MapPin, ThumbsUp, Wallet,
-  Bell, Image, CheckSquare, Coins, CircleDollarSign, ArrowRightLeft } from
+  Bell, Image, CheckSquare, Coins, CircleDollarSign } from
 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import Navbar from '@/components/layout/Navbar';
 import ListingCard from '@/components/features/ListingCard';
 import { LiquidGlassBackground, GlassCard, GlassPill, GlassButton } from '@/components/features/LiquidGlass';
 import type { Listing, Category } from '@/types';
-
-const STATS = [
-{ label: 'Transactions Completed', target: 1893, decimals: 0, prefix: '', suffix: '', display: '1,893', icon: ShieldCheck },
-{ label: 'Total Escrow Volume', target: 8.4, decimals: 1, prefix: '$', suffix: 'M+', display: '$8.4M+', icon: TrendingUp },
-{ label: 'Verified Users', target: 1284, decimals: 0, prefix: '', suffix: '', display: '1,284', icon: Users },
-{ label: 'Dispute Rate', target: 1.2, decimals: 1, prefix: '< ', suffix: '%', display: '< 1.2%', icon: Star }];
-
-
-// Sub-component so each stat gets its own useCountUp hook instance
-function AnimatedStat({ stat, enabled }: {stat: typeof STATS[number];enabled: boolean;}) {
-  const count = useCountUp({ target: stat.target, decimals: stat.decimals, duration: 1600, enabled });
-  const formatted = stat.decimals === 0 ?
-  Math.round(count).toLocaleString() :
-  count.toFixed(stat.decimals);
-  return (
-    <div className="py-7 px-6 text-center">
-      <p className="text-2xl font-bold font-heading tabular-nums" style={{ color: '#C68000' }}>
-        {stat.prefix}{formatted}{stat.suffix}
-      </p>
-      <p className="text-xs mt-0.5" style={{ color: '#7A5C20' }}>{stat.label}</p>
-    </div>);
-
-}
 
 const BUYER_STEPS = [
 { step: 1, title: 'Create & Verify Account', description: 'Sign up with your email, verify with OTP, and set your password. Your identity is secured from the start.', icon: UserPlus },
@@ -316,23 +292,10 @@ function EscrowInstructions() {
 
 export default function Index() {
   const [favorites, setFavorites] = useState<string[]>([]);
-  const [statsVisible, setStatsVisible] = useState(false);
   const [featuredListings, setFeaturedListings] = useState<Listing[]>([]);
   const [featuredLoading, setFeaturedLoading] = useState(true);
   const [categories, setCategories] = useState<Category[]>([]);
-  const statsRef = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
-
-  useEffect(() => {
-    const el = statsRef.current;
-    if (!el) return;
-    const observer = new IntersectionObserver(
-      ([entry]) => {if (entry.isIntersecting) {setStatsVisible(true);observer.disconnect();}},
-      { threshold: 0.25 }
-    );
-    observer.observe(el);
-    return () => observer.disconnect();
-  }, []);
 
   useEffect(() => {
     fetch('/api/featured-listings')
@@ -610,19 +573,6 @@ export default function Index() {
           </div>
         </div>
       </div>
-
-      {/* ─── Stats Strip ─── */}
-
-
-
-
-
-
-
-
-
-
-
 
       {/* ─── Categories ─── */}
       <section className="py-20 overflow-hidden" style={{ background: 'linear-gradient(180deg, #FFFDF5 0%, rgba(255,248,220,0.50) 50%, #FFFDF5 100%)' }}>

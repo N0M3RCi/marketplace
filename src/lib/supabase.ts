@@ -163,6 +163,7 @@ class QueryBuilder {
       wallets: '/api/wallet',
       wallet_transactions: '/api/admin/wallet-transactions',
       payment_settings: '/api/admin/payment-settings',
+      payment_addresses: '/api/payment-addresses',
       seller_requests: '/api/seller-requests',
       payouts: '/api/admin/payouts',
       dispute_evidence: '/api/admin/disputes',
@@ -201,13 +202,16 @@ const authHandler = {
     if (!token) return { data: null, error: new Error('Not authenticated') };
     // Handle password update vs profile update
     if (attrs.password) {
-      // For role sync from admin
-      if (attrs.data?.role) {
-        await client.auth.updateProfile({ role: attrs.data.role });
-      }
+      await client.auth.changePassword(attrs.password, attrs.data?.newPassword || attrs.password);
+    }
+    if (attrs.data?.role) {
+      await client.auth.updateProfile({ role: attrs.data.role });
     }
     if (attrs.data?.username) {
       await client.auth.updateProfile({ username: attrs.data.username });
+    }
+    if (attrs.data?.email) {
+      await client.auth.updateProfile({ email: attrs.data.email });
     }
     return { data: { user: { id: '', user_metadata: attrs.data } }, error: null };
   },

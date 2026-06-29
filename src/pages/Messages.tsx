@@ -96,7 +96,7 @@ export default function Messages() {
   useEffect(() => {
     if (!user) return;
     setConvsLoading(true);
-    fetchConversations(user.id)
+    fetchConversations()
       .then(setConversations)
       .catch(() => toast.error('Failed to load conversations'))
       .finally(() => setConvsLoading(false));
@@ -116,7 +116,7 @@ export default function Messages() {
       .then(msgs => {
         setMessages(msgs);
         scrollToBottom();
-        markConversationRead(activeConvId, user.id, isBuyer ?? true).catch(() => {});
+        markConversationRead(activeConvId, isBuyer ?? true).catch(() => {});
         // Reset unread
         setConversations(prev => prev.map(c => c.id === activeConvId ? { ...c, unreadCount: 0 } : c));
       })

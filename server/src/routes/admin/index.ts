@@ -1,6 +1,5 @@
 import { Router } from 'express';
 import argon2 from 'argon2';
-import bcryptjs from 'bcryptjs';
 import { adminOnly } from '../../middleware/auth.js';
 import type { AuthRequest } from '../../middleware/auth.js';
 import pool from '../../db.js';
@@ -15,7 +14,7 @@ router.use(adminOnly);
 // ============ USERS ============
 router.get('/users', async (_req: AuthRequest, res) => {
   try {
-    const result = await pool.query('SELECT * FROM user_profiles ORDER BY created_at DESC');
+    const result = await pool.query('SELECT id, email, username, role, avatar_url, is_verified, is_active, status, phone, rating, total_transactions, created_at FROM user_profiles ORDER BY created_at DESC');
     res.json(result.rows.map((u: any) => ({
       id: u.id, email: u.email, username: u.username, role: u.role,
       avatar_url: u.avatar_url, is_verified: u.is_verified, is_active: u.is_active,
@@ -140,6 +139,12 @@ router.delete('/users/:id', async (req: AuthRequest, res) => {
     await pool.query('DELETE FROM favorites WHERE user_id = $1::uuid', [id]);
     await pool.query('DELETE FROM audit_logs WHERE entity_id = $1', [id]);
     await pool.query('DELETE FROM audit_logs WHERE admin_id = $1::uuid', [id]);
+    // Delete reviews referencing this user
+    await pool.query('DELETE FROM reviews WHERE seller_id = $1::uuid OR reviewer_id = $1::uuid', [id]);
+    // Delete dispute evidence
+    await pool.query('DELETE FROM dispute_evidence WHERE uploaded_by = $1::uuid', [id]);
+    // Delete payouts
+    await pool.query('DELETE FROM payouts WHERE seller_id = $1::uuid', [id]);
 
     // Handle conversations — delete messages then conversations where user is participant
     const convs = await pool.query('SELECT id FROM conversations WHERE buyer_id = $1::uuid OR seller_id = $1::uuid', [id]);

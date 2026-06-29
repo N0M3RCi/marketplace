@@ -103,6 +103,15 @@ router.post('/', validate(escrowSchemas.createEscrow), async (req: AuthRequest, 
 // PUT /api/escrow/:id
 router.put('/:id', validate(escrowSchemas.updateEscrow), async (req: AuthRequest, res) => {
   try {
+    // Verify user is buyer, seller, or admin
+    const caseCheck = await pool.query('SELECT buyer_id, seller_id FROM escrow_cases WHERE id = $1', [req.params.id]);
+    if (caseCheck.rows.length === 0) { res.status(404).json({ error: 'Case not found' }); return; }
+    const esc = caseCheck.rows[0];
+    if (req.userId !== esc.buyer_id && req.userId !== esc.seller_id && req.userRole !== 'admin') {
+      res.status(403).json({ error: 'Access denied: you are not a participant in this escrow case' });
+      return;
+    }
+
     const updates: string[] = []; const vals: any[] = []; let idx = 1;
     const allowed = ['status', 'payment_address', 'payment_network', 'payment_method', 'payment_reference',
       'payment_proof_url', 'payment_amount_sent', 'payment_submitted_at', 'payment_verified_at', 'payment_admin_notes',
@@ -128,9 +137,18 @@ router.put('/:id', validate(escrowSchemas.updateEscrow), async (req: AuthRequest
   }
 });
 
-// GET /api/escrow/:id/timeline
+// GET /api/escrow/:id/timeline — must be before /:id catch-all
 router.get('/:id/timeline', async (req: AuthRequest, res) => {
   try {
+    // Verify user is a participant or admin
+    const caseCheck = await pool.query('SELECT buyer_id, seller_id FROM escrow_cases WHERE id = $1', [req.params.id]);
+    if (caseCheck.rows.length === 0) { res.status(404).json({ error: 'Case not found' }); return; }
+    const esc = caseCheck.rows[0];
+    if (req.userId !== esc.buyer_id && req.userId !== esc.seller_id && req.userRole !== 'admin') {
+      res.status(403).json({ error: 'Access denied: you are not a participant in this escrow case' });
+      return;
+    }
+
     const result = await pool.query('SELECT * FROM escrow_timeline WHERE case_id = $1 ORDER BY created_at ASC', [req.params.id]);
     res.json(result.rows.map((t: any) => ({
       id: t.id, status: t.status, label: t.label, timestamp: t.created_at,
@@ -145,6 +163,17 @@ router.get('/:id/timeline', async (req: AuthRequest, res) => {
 router.post('/timeline', validate(escrowSchemas.addTimeline), async (req: AuthRequest, res) => {
   try {
     const { caseId, status, label, actorName, actorRole, notes } = req.body;
+    if (!caseId) { res.status(400).json({ error: 'caseId is required' }); return; }
+
+    // Verify user is a participant or admin
+    const caseCheck = await pool.query('SELECT buyer_id, seller_id FROM escrow_cases WHERE id = $1', [caseId]);
+    if (caseCheck.rows.length === 0) { res.status(404).json({ error: 'Case not found' }); return; }
+    const esc = caseCheck.rows[0];
+    if (req.userId !== esc.buyer_id && req.userId !== esc.seller_id && req.userRole !== 'admin') {
+      res.status(403).json({ error: 'Access denied: you are not a participant in this escrow case' });
+      return;
+    }
+
     await pool.query(
       'INSERT INTO escrow_timeline (case_id, status, label, actor_name, actor_role, notes) VALUES ($1,$2,$3,$4,$5,$6)',
       [caseId, status, label, actorName, actorRole, notes]);

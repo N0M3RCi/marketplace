@@ -11,7 +11,7 @@ import { escrow, storage, paymentAddresses } from '@/lib/client';
 import { useAuth } from '@/hooks/useAuth';
 import { formatCurrency, formatDateTime, formatDate, cn } from '@/lib/utils';
 import { ESCROW_STATUS_CONFIG, DISPUTE_REASONS } from '@/constants';
-import { generateQR, getNetworkSymbol } from '@/lib/qr';
+import { generateQR } from '@/lib/qr';
 import { toast } from 'sonner';
 import type { EscrowStatus } from '@/types';
 

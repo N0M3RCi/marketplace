@@ -7,7 +7,7 @@ export const createListing = z.object({
   currency: z.string().max(10).default('USD'),
   categoryId: z.string().uuid('Invalid category ID').optional().nullable(),
   images: z.array(z.string()).max(20).default([]),
-  condition: z.enum(['new', 'like_new', 'good', 'fair', 'poor']).default('good'),
+  condition: z.enum(['new', 'like-new', 'good', 'fair', 'poor']).default('good'),
   location: z.string().max(200).default(''),
   sellerId: z.string().uuid().optional().nullable(),
 });
@@ -19,7 +19,7 @@ export const updateListing = z.object({
   currency: z.string().max(10).optional(),
   categoryId: z.string().uuid().optional().nullable(),
   images: z.array(z.string()).max(20).optional(),
-  condition: z.enum(['new', 'like_new', 'good', 'fair', 'poor']).optional(),
+  condition: z.enum(['new', 'like-new', 'good', 'fair', 'poor']).optional(),
   location: z.string().max(200).optional(),
   status: z.enum(['active', 'inactive', 'sold']).optional(),
 });

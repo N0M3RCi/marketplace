@@ -26,7 +26,7 @@ export default function Navbar() {
 
   useEffect(() => {
     if (user) {
-      fetchNotifications(user.id).then(setNotifications).catch(() => {});
+      fetchNotifications().then(setNotifications).catch(() => {});
     }
   }, [user, location.pathname]);
 

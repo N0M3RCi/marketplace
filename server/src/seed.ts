@@ -2,6 +2,11 @@ import pool from './db.js';
 import argon2 from 'argon2';
 import { v4 as uuid } from 'uuid';
 
+function placeholderImg(label: string): string {
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="600" height="400" viewBox="0 0 600 400"><rect width="600" height="400" fill="#F5F0E0"/><text x="300" y="200" font-family="sans-serif" font-size="28" fill="#8B7355" text-anchor="middle" dominant-baseline="middle">${label}</text></svg>`;
+  return `data:image/svg+xml;base64,${Buffer.from(svg).toString('base64')}`;
+}
+
 async function seed() {
   const hash = await argon2.hash('password123');
 
@@ -35,12 +40,12 @@ async function seed() {
 
   // Listings
   const l1 = uuid(), l2 = uuid(), l3 = uuid(), l4 = uuid(), l5 = uuid(), l6 = uuid();
-  await pool.query('INSERT INTO listings (id, title, description, price, currency, category_id, seller_id, images, condition, location, status, view_count) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)', [l1, 'MacBook Pro M3 Max', 'Brand new MacBook Pro with M3 Max chip, 64GB RAM, 1TB SSD. Still sealed in box.', 3499.99, 'USD', catElectronics, sellerId, ['https://placehold.co/600x400?text=MacBook+Pro'], 'new', 'New York, NY', 'active', 234]);
-  await pool.query('INSERT INTO listings (id, title, description, price, currency, category_id, seller_id, images, condition, location, status, view_count) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)', [l2, 'Rolex Submariner 2024', 'Rolex Submariner Date 126610LN. Full set with box and papers. Mint condition.', 15999.99, 'USD', catWatches, sellerId, ['https://placehold.co/600x400?text=Rolex'], 'like-new', 'Miami, FL', 'active', 567]);
-  await pool.query('INSERT INTO listings (id, title, description, price, currency, category_id, seller_id, images, condition, location, status, view_count) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)', [l3, 'Tesla Model S Plaid', '2023 Tesla Model S Plaid. 10k miles, flawless condition. Full warranty.', 89999.99, 'USD', catVehicles, sellerId, ['https://placehold.co/600x400?text=Tesla'], 'like-new', 'Los Angeles, CA', 'active', 1893]);
-  await pool.query('INSERT INTO listings (id, title, description, price, currency, category_id, seller_id, images, condition, location, status, view_count) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)', [l4, 'Banksy Screen Print', 'Authentic Banksy screen print "Girl with Balloon". COA included. Framed.', 45000.00, 'USD', catArt, sellerId, ['https://placehold.co/600x400?text=Banksy'], 'good', 'London, UK', 'active', 445]);
-  await pool.query('INSERT INTO listings (id, title, description, price, currency, category_id, seller_id, images, condition, location, status, view_count) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)', [l5, 'Gibson Les Paul Standard', 'Gibson Les Paul Standard 60s Bourbon Burst. Professional setup done. Hard case.', 2899.99, 'USD', catInstruments, sellerId, ['https://placehold.co/600x400?text=Gibson'], 'like-new', 'Nashville, TN', 'active', 178]);
-  await pool.query('INSERT INTO listings (id, title, description, price, currency, category_id, seller_id, images, condition, location, status, view_count) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)', [l6, 'Cartier Love Bracelet', 'Cartier Love Bracelet 18K Yellow Gold. Size 17. Original box and certificate.', 6850.00, 'USD', catJewelry, sellerId, ['https://placehold.co/600x400?text=Cartier'], 'new', 'Beverly Hills, CA', 'active', 892]);
+  await pool.query('INSERT INTO listings (id, title, description, price, currency, category_id, seller_id, images, condition, location, status, view_count) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)', [l1, 'MacBook Pro M3 Max', 'Brand new MacBook Pro with M3 Max chip, 64GB RAM, 1TB SSD. Still sealed in box.', 3499.99, 'USD', catElectronics, sellerId, [placeholderImg('MacBook Pro')], 'new', 'New York, NY', 'active', 234]);
+  await pool.query('INSERT INTO listings (id, title, description, price, currency, category_id, seller_id, images, condition, location, status, view_count) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)', [l2, 'Rolex Submariner 2024', 'Rolex Submariner Date 126610LN. Full set with box and papers. Mint condition.', 15999.99, 'USD', catWatches, sellerId, [placeholderImg('Rolex')], 'like-new', 'Miami, FL', 'active', 567]);
+  await pool.query('INSERT INTO listings (id, title, description, price, currency, category_id, seller_id, images, condition, location, status, view_count) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)', [l3, 'Tesla Model S Plaid', '2023 Tesla Model S Plaid. 10k miles, flawless condition. Full warranty.', 89999.99, 'USD', catVehicles, sellerId, [placeholderImg('Tesla')], 'like-new', 'Los Angeles, CA', 'active', 1893]);
+  await pool.query('INSERT INTO listings (id, title, description, price, currency, category_id, seller_id, images, condition, location, status, view_count) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)', [l4, 'Banksy Screen Print', 'Authentic Banksy screen print "Girl with Balloon". COA included. Framed.', 45000.00, 'USD', catArt, sellerId, [placeholderImg('Banksy')], 'good', 'London, UK', 'active', 445]);
+  await pool.query('INSERT INTO listings (id, title, description, price, currency, category_id, seller_id, images, condition, location, status, view_count) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)', [l5, 'Gibson Les Paul Standard', 'Gibson Les Paul Standard 60s Bourbon Burst. Professional setup done. Hard case.', 2899.99, 'USD', catInstruments, sellerId, [placeholderImg('Gibson')], 'like-new', 'Nashville, TN', 'active', 178]);
+  await pool.query('INSERT INTO listings (id, title, description, price, currency, category_id, seller_id, images, condition, location, status, view_count) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)', [l6, 'Cartier Love Bracelet', 'Cartier Love Bracelet 18K Yellow Gold. Size 17. Original box and certificate.', 6850.00, 'USD', catJewelry, sellerId, [placeholderImg('Cartier')], 'new', 'Beverly Hills, CA', 'active', 892]);
 
   // Escrow cases
   const esc1 = 'ESC-2024-001', esc2 = 'ESC-2024-002', esc3 = 'ESC-2024-003';

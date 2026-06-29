@@ -182,6 +182,7 @@ async function runMigrations() {
     { name: 'reviews', sql: `CREATE TABLE IF NOT EXISTS reviews (id UUID PRIMARY KEY DEFAULT gen_random_uuid(), seller_id UUID NOT NULL REFERENCES user_profiles(id), reviewer_id UUID NOT NULL REFERENCES user_profiles(id), rating INTEGER DEFAULT 5, comment TEXT, created_at TIMESTAMPTZ DEFAULT NOW())` },
     { name: 'audit_logs', sql: `CREATE TABLE IF NOT EXISTS audit_logs (id UUID PRIMARY KEY DEFAULT gen_random_uuid(), admin_id UUID REFERENCES user_profiles(id), admin_name TEXT, action TEXT NOT NULL, entity_type TEXT, entity_id TEXT, details TEXT, ip_address TEXT, created_at TIMESTAMPTZ DEFAULT NOW())` },
     { name: 'uploaded_files', sql: `CREATE TABLE IF NOT EXISTS uploaded_files (id UUID PRIMARY KEY DEFAULT gen_random_uuid(), file_name TEXT NOT NULL, file_type TEXT NOT NULL, file_size INTEGER NOT NULL, file_data TEXT NOT NULL, uploaded_by UUID REFERENCES user_profiles(id), created_at TIMESTAMPTZ DEFAULT NOW())` },
+    { name: 'uploaded_files_file_path', sql: `ALTER TABLE uploaded_files ADD COLUMN IF NOT EXISTS file_path TEXT` },
     { name: 'messages_image_url', sql: `ALTER TABLE messages ADD COLUMN IF NOT EXISTS image_url TEXT` },
     { name: 'messages_file_url', sql: `ALTER TABLE messages ADD COLUMN IF NOT EXISTS file_url TEXT` },
     { name: 'messages_file_name', sql: `ALTER TABLE messages ADD COLUMN IF NOT EXISTS file_name TEXT` },

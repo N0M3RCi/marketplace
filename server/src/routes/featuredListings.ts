@@ -8,7 +8,7 @@ router.get('/', async (_req, res) => {
     const result = await pool.query(`
       SELECT fl.sort_order,
         l.id, l.title, l.description, l.price, l.currency, l.condition, l.location,
-        l.images, l.created_at,
+        l.images, l.created_at, l.seller_id, l.status, l.view_count,
         c.name as category_name, c.id as category_id,
         up.username as seller_name, up.rating as seller_rating
       FROM featured_listings fl
