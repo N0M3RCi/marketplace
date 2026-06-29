@@ -1,3 +1,8 @@
 {
-  "startupCommands": ["cd server && npm run dev", "npm run dev"]
+  "startupCommands": ["cd server && npm run dev", "npm run dev"],
+  "github": {
+    "owner": "N0M3RCi",
+    "repo": "marketplace",
+    "url": "https://github.com/N0M3RCi/marketplace.git"
+  }
 }

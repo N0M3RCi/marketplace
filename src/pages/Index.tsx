@@ -113,10 +113,7 @@ const TRUST_BADGES = [
 { icon: Activity, label: 'Live Admin Oversight', sub: 'Real-time monitoring' }];
 
 
-const RECENT_ACTIVITY = [
-{ user: 'A. Thompson', action: 'Purchased', item: 'Rolex Submariner', amount: '$9,200', time: '2m ago' },
-{ user: 'M. Okafor', action: 'Sold', item: 'MacBook Pro M3', amount: '$2,850', time: '7m ago' },
-{ user: 'S. Lim', action: 'Purchased', item: 'Patek Calatrava', amount: '$14,500', time: '12m ago' }];
+const RECENT_ACTIVITY: { user: string; action: string; item: string; amount: string; time: string; }[] = [];
 
 
 function EscrowInstructions() {
@@ -319,7 +316,6 @@ function EscrowInstructions() {
 
 export default function Index() {
   const [favorites, setFavorites] = useState<string[]>([]);
-  const [activeActivity, setActiveActivity] = useState(0);
   const [statsVisible, setStatsVisible] = useState(false);
   const [featuredListings, setFeaturedListings] = useState<Listing[]>([]);
   const [featuredLoading, setFeaturedLoading] = useState(true);
