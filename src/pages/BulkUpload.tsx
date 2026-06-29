@@ -208,14 +208,14 @@ export default function BulkUpload() {
 
   if (user.role !== 'admin') {
     return (
-      <div className="min-h-screen" style={{ background: '#000000' }}>
+      <div className="min-h-screen" style={{ background: '#FFFDF5' }}>
         <Navbar />
         <div className="max-w-lg mx-auto px-4 sm:px-6 py-24 text-center">
-          <div className="w-16 h-16 rounded-2xl mx-auto mb-6 flex items-center justify-center" style={{ background: 'rgba(255,224,0,0.10)', border: '1px solid rgba(255,224,0,0.22)' }}>
-            <ShieldCheck className="w-8 h-8" style={{ color: 'rgba(255,224,0,0.75)' }} />
+          <div className="w-16 h-16 rounded-2xl mx-auto mb-6 flex items-center justify-center" style={{ background: 'rgba(240,184,0,0.18)', border: '1px solid rgba(240,184,0,0.40)' }}>
+            <ShieldCheck className="w-8 h-8" style={{ color: '#B87000' }} />
           </div>
-          <h1 className="font-heading text-2xl font-bold mb-3" style={{ color: 'rgba(255,255,255,0.90)' }}>Admin Only</h1>
-          <p className="text-sm leading-relaxed mb-6" style={{ color: 'rgba(255,255,255,0.50)' }}>
+          <h1 className="font-heading text-2xl font-bold mb-3" style={{ color: '#1A1000' }}>Admin Only</h1>
+          <p className="text-sm leading-relaxed mb-6" style={{ color: '#7A5C20' }}>
             Bulk listing upload is available to administrators only.
           </p>
         </div>
@@ -224,14 +224,14 @@ export default function BulkUpload() {
   }
 
   return (
-    <div className="min-h-screen" style={{ background: '#000000' }}>
+    <div className="min-h-screen" style={{ background: '#FFFDF5' }}>
       <Navbar />
       <div className="max-w-4xl mx-auto px-4 sm:px-6 py-8">
         {/* Header */}
         <div className="flex items-start justify-between mb-6 flex-wrap gap-4">
           <div>
-            <h1 className="font-heading text-2xl font-bold" style={{ color: 'rgba(255,255,255,0.90)' }}>Bulk Upload Listings</h1>
-            <p className="text-sm mt-1" style={{ color: 'rgba(255,255,255,0.40)' }}>
+            <h1 className="font-heading text-2xl font-bold" style={{ color: '#1A1000' }}>Bulk Upload Listings</h1>
+            <p className="text-sm mt-1" style={{ color: '#9A7C40' }}>
               Create {slots.length} listing{slots.length !== 1 ? 's' : ''} at once — all fields match the single listing form
             </p>
           </div>
@@ -240,7 +240,7 @@ export default function BulkUpload() {
               variant="outline"
               onClick={() => navigate('/sell')}
               size="sm"
-              style={{ borderColor: 'rgba(255,255,255,0.15)', color: 'rgba(255,255,255,0.65)', background: 'transparent' }}
+              style={{ borderColor: 'rgba(240,184,0,0.20)', color: '#7A5C20', background: 'transparent' }}
             >
               Single Listing
             </Button>
@@ -254,9 +254,9 @@ export default function BulkUpload() {
 
         {/* Results Summary */}
         {showResults && results.length > 0 && (
-          <div className="mb-6 rounded-xl overflow-hidden" style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.10)' }}>
-            <div className="px-5 py-3" style={{ borderBottom: '1px solid rgba(255,255,255,0.07)' }}>
-              <h2 className="font-semibold text-sm" style={{ color: 'rgba(255,255,255,0.88)' }}>Results</h2>
+          <div className="mb-6 rounded-xl overflow-hidden" style={{ background: 'rgba(240,184,0,0.06)', border: '1px solid rgba(240,184,0,0.12)' }}>
+            <div className="px-5 py-3" style={{ borderBottom: '1px solid rgba(240,184,0,0.08)' }}>
+              <h2 className="font-semibold text-sm" style={{ color: '#1A1000' }}>Results</h2>
             </div>
             <div className="divide-y divide-border/50">
               {results.map((r) => (
@@ -266,8 +266,8 @@ export default function BulkUpload() {
                   ) : (
                     <AlertTriangle className="w-4 h-4 text-red-500 flex-shrink-0" />
                   )}
-                  <span className="text-xs font-mono" style={{ color: 'rgba(255,255,255,0.40)' }}>#{r.index}</span>
-                  <span className="text-sm flex-1 truncate" style={{ color: 'rgba(255,255,255,0.75)' }}>{r.title || '(untitled)'}</span>
+                  <span className="text-xs font-mono" style={{ color: '#B89A60' }}>#{r.index}</span>
+                  <span className="text-sm flex-1 truncate" style={{ color: '#6B5020' }}>{r.title || '(untitled)'}</span>
                   {r.success ? (
                     <span className="text-xs text-emerald-500 font-medium">Created</span>
                   ) : (
@@ -276,12 +276,12 @@ export default function BulkUpload() {
                 </div>
               ))}
             </div>
-            <div className="px-5 py-3 flex justify-between items-center" style={{ borderTop: '1px solid rgba(255,255,255,0.07)' }}>
-              <span className="text-sm" style={{ color: 'rgba(255,255,255,0.50)' }}>
+            <div className="px-5 py-3 flex justify-between items-center" style={{ borderTop: '1px solid rgba(240,184,0,0.08)' }}>
+              <span className="text-sm" style={{ color: '#9A7C40' }}>
                 {results.filter(r => r.success).length} / {results.length} created
               </span>
               <Button onClick={resetAll} size="sm" variant="outline" className="text-xs"
-                style={{ borderColor: 'rgba(255,224,0,0.30)', color: '#FFE000', background: 'transparent' }}>
+                style={{ borderColor: 'rgba(240,184,0,0.40)', color: '#C68000', background: 'transparent' }}>
                 Start Fresh
               </Button>
             </div>
@@ -289,22 +289,22 @@ export default function BulkUpload() {
         )}
 
         {/* Assign Seller (admin) */}
-        <div className="mb-6 rounded-xl p-4" style={{ background: 'rgba(255,215,60,0.06)', border: '1px solid rgba(255,215,60,0.20)' }}>
-          <label className="block text-xs font-semibold mb-2 flex items-center gap-1.5" style={{ color: 'rgba(255,235,100,0.85)' }}>
+        <div className="mb-6 rounded-xl p-4" style={{ background: 'rgba(240,184,0,0.06)', border: '1px solid rgba(240,184,0,0.20)' }}>
+          <label className="block text-xs font-semibold mb-2 flex items-center gap-1.5" style={{ color: '#B87000' }}>
             Assign All Listings To
           </label>
           <select
             value={selectedSellerId}
             onChange={e => setSelectedSellerId(e.target.value)}
             className="w-full px-3 py-2.5 text-sm rounded-xl focus:outline-none"
-            style={{ background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.12)', color: 'rgba(255,255,255,0.85)' }}
+            style={{ background: 'rgba(240,184,0,0.08)', border: '1px solid rgba(240,184,0,0.15)', color: '#4A3000' }}
           >
             <option value="">Myself (admin)</option>
             {sellers.filter(s => s.id !== user.id).map(s => (
               <option key={s.id} value={s.id}>{s.username} ({s.email})</option>
             ))}
           </select>
-          <p className="text-xs mt-1.5" style={{ color: 'rgba(255,255,255,0.35)' }}>
+          <p className="text-xs mt-1.5" style={{ color: '#9A7C40' }}>
             Applies to all slots below
           </p>
         </div>
@@ -312,16 +312,16 @@ export default function BulkUpload() {
         {/* Listing Slots */}
         <div className="space-y-4 mb-6">
           {slots.map((slot, idx) => (
-            <div key={idx} className="rounded-xl overflow-hidden" style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,215,60,0.12)' }}>
+            <div key={idx} className="rounded-xl overflow-hidden" style={{ background: 'rgba(240,184,0,0.06)', border: '1px solid rgba(240,184,0,0.12)' }}>
               {/* Slot Header */}
-              <div className="flex items-center justify-between px-5 py-3" style={{ borderBottom: '1px solid rgba(255,255,255,0.07)' }}>
+              <div className="flex items-center justify-between px-5 py-3" style={{ borderBottom: '1px solid rgba(240,184,0,0.08)' }}>
                 <div className="flex items-center gap-2">
-                  <span className="text-xs font-mono font-bold" style={{ color: 'rgba(255,215,60,0.70)' }}>#{idx + 1}</span>
+                  <span className="text-xs font-mono font-bold" style={{ color: '#B87000' }}>#{idx + 1}</span>
                   {slot.title.trim() && (
-                    <span className="text-xs truncate max-w-[200px]" style={{ color: 'rgba(255,255,255,0.50)' }}>{slot.title.trim()}</span>
+                    <span className="text-xs truncate max-w-[200px]" style={{ color: '#9A7C40' }}>{slot.title.trim()}</span>
                   )}
                   {submitting && processingIndex === idx && (
-                    <Loader2 className="w-3 h-3 animate-spin" style={{ color: 'rgba(255,215,60,0.60)' }} />
+                    <Loader2 className="w-3 h-3 animate-spin" style={{ color: '#B87000' }} />
                   )}
                 </div>
                 {slots.length > 1 && !submitting && (
@@ -339,90 +339,90 @@ export default function BulkUpload() {
                 {/* Row 1: Title + Location */}
                 <div className="grid sm:grid-cols-3 gap-3">
                   <div className="sm:col-span-2">
-                    <label className="block text-xs font-medium mb-1" style={{ color: 'rgba(255,255,255,0.55)' }}>Title <span className="text-red-400">*</span></label>
+                    <label className="block text-xs font-medium mb-1" style={{ color: '#9A7C40' }}>Title <span className="text-red-400">*</span></label>
                     <input type="text" value={slot.title} onChange={e => updateSlot(idx, 'title', e.target.value)}
                       placeholder="e.g. Apple MacBook Pro 16"
                       maxLength={120}
                       className="w-full px-3 py-2 text-sm rounded-xl focus:outline-none"
-                      style={{ background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.12)', color: 'rgba(255,255,255,0.85)' }} />
+                      style={{ background: 'rgba(240,184,0,0.08)', border: '1px solid rgba(240,184,0,0.15)', color: '#4A3000' }} />
                   </div>
                   <div>
-                    <label className="block text-xs font-medium mb-1" style={{ color: 'rgba(255,255,255,0.55)' }}>
+                    <label className="block text-xs font-medium mb-1" style={{ color: '#9A7C40' }}>
                       <MapPin className="inline w-3 h-3 mr-0.5" /> Location <span className="text-red-400">*</span>
                     </label>
                     <input type="text" value={slot.location} onChange={e => updateSlot(idx, 'location', e.target.value)}
                       placeholder="e.g. New York, NY"
                       className="w-full px-3 py-2 text-sm rounded-xl focus:outline-none"
-                      style={{ background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.12)', color: 'rgba(255,255,255,0.85)' }} />
+                      style={{ background: 'rgba(240,184,0,0.08)', border: '1px solid rgba(240,184,0,0.15)', color: '#4A3000' }} />
                   </div>
                 </div>
 
                 {/* Row 2: Category + Condition + Price */}
                 <div className="grid sm:grid-cols-4 gap-3">
                   <div className="sm:col-span-2">
-                    <label className="block text-xs font-medium mb-1" style={{ color: 'rgba(255,255,255,0.55)' }}>Category <span className="text-red-400">*</span></label>
+                    <label className="block text-xs font-medium mb-1" style={{ color: '#9A7C40' }}>Category <span className="text-red-400">*</span></label>
                     <div className="flex flex-wrap gap-1.5">
                       {categories.slice(0, 6).map(cat => (
                         <button key={cat.id} type="button" onClick={() => updateSlot(idx, 'categoryId', cat.id)}
                           className="px-2.5 py-1 rounded-lg text-[11px] font-medium transition-all"
                           style={slot.categoryId === cat.id
-                            ? { background: 'rgba(255,215,60,0.15)', border: '1px solid rgba(255,215,60,0.35)', color: 'rgba(255,235,100,0.90)' }
-                            : { background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.10)', color: 'rgba(255,255,255,0.45)' }}
+                            ? { background: 'rgba(240,184,0,0.18)', border: '1px solid rgba(240,184,0,0.35)', color: '#9A5800' }
+                            : { background: 'rgba(240,184,0,0.06)', border: '1px solid rgba(240,184,0,0.12)', color: '#B89A60' }}
                         >{cat.name}</button>
                       ))}
                       {categories.length > 6 && (
                         <select value={slot.categoryId} onChange={e => updateSlot(idx, 'categoryId', e.target.value)}
                           className="px-2 py-1 rounded-lg text-[11px]"
-                          style={{ background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.12)', color: 'rgba(255,255,255,0.65)' }}>
+                          style={{ background: 'rgba(240,184,0,0.08)', border: '1px solid rgba(240,184,0,0.15)', color: '#7A5C20' }}>
                           <option value="">More...</option>
                           {categories.slice(6).map(cat => (
-                            <option key={cat.id} value={cat.id} style={{ background: '#111', color: '#eee' }}>{cat.name}</option>
+                            <option key={cat.id} value={cat.id} style={{ background: '#FFFDF5', color: '#4A3000' }}>{cat.name}</option>
                           ))}
                         </select>
                       )}
                     </div>
                   </div>
                   <div>
-                    <label className="block text-xs font-medium mb-1" style={{ color: 'rgba(255,255,255,0.55)' }}>Condition <span className="text-red-400">*</span></label>
+                    <label className="block text-xs font-medium mb-1" style={{ color: '#9A7C40' }}>Condition <span className="text-red-400">*</span></label>
                     <select value={slot.condition} onChange={e => updateSlot(idx, 'condition', e.target.value)}
                       className="w-full px-3 py-2 text-sm rounded-xl focus:outline-none"
-                      style={{ background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.12)', color: 'rgba(255,255,255,0.85)' }}>
-                      {CONDITIONS.map(c => <option key={c.value} value={c.value} style={{ background: '#111', color: '#eee' }}>{c.label}</option>)}
+                      style={{ background: 'rgba(240,184,0,0.08)', border: '1px solid rgba(240,184,0,0.15)', color: '#4A3000' }}>
+                      {CONDITIONS.map(c => <option key={c.value} value={c.value} style={{ background: '#FFFDF5', color: '#4A3000' }}>{c.label}</option>)}
                     </select>
                   </div>
                   <div>
-                    <label className="block text-xs font-medium mb-1" style={{ color: 'rgba(255,255,255,0.55)' }}>
+                    <label className="block text-xs font-medium mb-1" style={{ color: '#9A7C40' }}>
                       <DollarSign className="inline w-3 h-3" /> Price <span className="text-red-400">*</span>
                     </label>
                     <div className="flex gap-1">
                       <select value={slot.currency} onChange={e => updateSlot(idx, 'currency', e.target.value)}
                         className="w-16 px-1 py-2 text-xs rounded-xl focus:outline-none"
-                        style={{ background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.12)', color: 'rgba(255,255,255,0.82)' }}>
-                        {CURRENCIES.map(c => <option key={c} value={c} style={{ background: '#111', color: '#eee' }}>{c}</option>)}
+                        style={{ background: 'rgba(240,184,0,0.08)', border: '1px solid rgba(240,184,0,0.15)', color: '#4A3000' }}>
+                        {CURRENCIES.map(c => <option key={c} value={c} style={{ background: '#FFFDF5', color: '#4A3000' }}>{c}</option>)}
                       </select>
                       <input type="number" value={slot.price} onChange={e => updateSlot(idx, 'price', e.target.value)}
                         placeholder="0.00" min="1" step="0.01"
                         className="flex-1 px-3 py-2 text-sm rounded-xl focus:outline-none"
-                        style={{ background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.12)', color: 'rgba(255,255,255,0.85)' }} />
+                        style={{ background: 'rgba(240,184,0,0.08)', border: '1px solid rgba(240,184,0,0.15)', color: '#4A3000' }} />
                     </div>
                   </div>
                 </div>
 
                 {/* Row 3: Description */}
                 <div>
-                  <label className="block text-xs font-medium mb-1" style={{ color: 'rgba(255,255,255,0.55)' }}>Description <span className="text-red-400">*</span></label>
+                  <label className="block text-xs font-medium mb-1" style={{ color: '#9A7C40' }}>Description <span className="text-red-400">*</span></label>
                   <textarea value={slot.description} onChange={e => updateSlot(idx, 'description', e.target.value)}
                     placeholder="Describe the item in detail..."
                     rows={2} maxLength={2000}
                     className="w-full px-3 py-2 text-sm rounded-xl focus:outline-none resize-none"
-                    style={{ background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.12)', color: 'rgba(255,255,255,0.85)' }} />
+                    style={{ background: 'rgba(240,184,0,0.08)', border: '1px solid rgba(240,184,0,0.15)', color: '#4A3000' }} />
                 </div>
 
                 {/* Row 4: Images */}
                 <div>
-                  <label className="block text-xs font-medium mb-1.5" style={{ color: 'rgba(255,255,255,0.55)' }}>
+                  <label className="block text-xs font-medium mb-1.5" style={{ color: '#9A7C40' }}>
                     Photos <span className="text-red-400">*</span>
-                    <span className="font-normal ml-1" style={{ color: 'rgba(255,255,255,0.30)' }}>({slot.images.length}/8)</span>
+                    <span className="font-normal ml-1" style={{ color: '#C8B48C' }}>({slot.images.length}/8)</span>
                   </label>
                   <div className="flex gap-2 flex-wrap">
                     {slot.imageUrls.map((url, imgIdx) => (
@@ -438,7 +438,7 @@ export default function BulkUpload() {
                     ))}
                     {slot.images.length < 8 && (
                       <label className="w-14 h-14 rounded-lg border-2 border-dashed border-muted flex flex-col items-center justify-center cursor-pointer hover:border-[hsl(var(--brand-navy))]/50 transition-colors">
-                        <Plus className="w-4 h-4" style={{ color: 'rgba(255,255,255,0.30)' }} />
+                        <Plus className="w-4 h-4" style={{ color: '#C8B48C' }} />
                         <input type="file" accept="image/jpeg,image/png,image/webp" multiple
                           onChange={e => handleFilePick(idx, e)} className="hidden" />
                       </label>
@@ -454,12 +454,12 @@ export default function BulkUpload() {
         <div className="flex items-center justify-between gap-4 flex-wrap">
           <div>
             {submitting && processingIndex >= 0 ? (
-              <p className="text-xs" style={{ color: 'rgba(255,215,60,0.55)' }}>
+              <p className="text-xs" style={{ color: '#B87000' }}>
                 <Loader2 className="w-3 h-3 animate-spin inline mr-1" />
                 Creating listing #{processingIndex + 1} of {slots.length}...
               </p>
             ) : (
-              <p className="text-xs" style={{ color: 'rgba(255,255,255,0.35)' }}>
+              <p className="text-xs" style={{ color: '#9A7C40' }}>
                 {slots.filter(s => isSlotValid(s) === null).length} of {slots.length} slots ready
               </p>
             )}
@@ -468,7 +468,7 @@ export default function BulkUpload() {
             <Button
               variant="outline"
               onClick={() => navigate('/sell')}
-              style={{ borderColor: 'rgba(255,255,255,0.15)', color: 'rgba(255,255,255,0.65)', background: 'transparent' }}
+              style={{ borderColor: 'rgba(240,184,0,0.20)', color: '#7A5C20', background: 'transparent' }}
             >
               <ChevronLeft className="w-4 h-4 mr-1.5" /> Single Listing
             </Button>
