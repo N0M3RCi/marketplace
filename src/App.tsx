@@ -78,6 +78,7 @@ const App = () => (
               <Route path="users" element={<AdminUsers />} />
               <Route path="listings" element={<AdminListings />} />
               <Route path="categories" element={<AdminCategories />} />
+              <Route path="bulk-upload" element={<BulkUpload />} />
               <Route path="homepage-categories" element={<AdminHomepageCategories />} />
               <Route path="featured-listings" element={<AdminFeaturedListings />} />
               <Route path="messages" element={<AdminMessages />} />
