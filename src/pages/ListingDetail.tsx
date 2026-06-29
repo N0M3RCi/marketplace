@@ -192,7 +192,7 @@ export default function ListingDetail() {
   const sellerProfile = (listing as any).sellerProfile;
 
   return (
-    <div className="min-h-screen" style={{ background: '#090907' }}>
+    <div className="min-h-screen" style={{ background: '#FFFDF5' }}>
       <Navbar />
 
       {/* Breadcrumb */}

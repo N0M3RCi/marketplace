@@ -71,50 +71,51 @@ export default function Marketplace() {
   const listingsWithFav = listings.map(l => ({ ...l, isFavorited: favorites.includes(l.id) }));
 
   return (
-    <div className="min-h-screen" style={{ background: '#000000' }}>
+    <div className="min-h-screen" style={{ background: '#FFFDF5' }}>
       <Navbar />
 
       {/* Sub-header */}
-      <div style={{ background: 'rgba(255,255,255,0.04)', borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
+      <div style={{ background: 'rgba(240,184,0,0.04)', borderBottom: '1px solid rgba(240,184,0,0.10)' }}>
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
           <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between">
             <div>
-              <h1 className="font-heading text-xl font-bold" style={{ color: 'rgba(255,255,255,0.90)' }}>Marketplace</h1>
-              <p className="text-sm" style={{ color: 'rgba(255,255,255,0.40)' }}>
-                {listingsLoading ? 'Loading…' : `${listingsWithFav.length} escrow-protected listings`}
+              <h1 className="font-heading text-xl font-bold" style={{ color: '#1A1000' }}>Marketplace</h1>
+              <p className="text-sm" style={{ color: '#9A7C40' }}>
+                {listingsLoading ? 'Loading...' : `${listingsWithFav.length} escrow-protected listings`}
               </p>
             </div>
             <div className="flex items-center gap-2 w-full sm:w-auto">
               <div className="relative flex-1 sm:w-64">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4" style={{ color: '#9A7C40' }} />
                 <input type="text" placeholder="Search listings..." value={searchQuery} onChange={e => setSearchQuery(e.target.value)}
                   className="w-full pl-9 pr-3 py-2 text-sm rounded-lg focus:outline-none focus:ring-1 transition-all"
-                  style={{ background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.10)', color: 'rgba(255,255,255,0.85)' }} />
+                  style={{ background: 'rgba(240,184,0,0.06)', border: '1px solid rgba(240,184,0,0.18)', color: '#1A1000' }} />
               </div>
               <select value={sortBy} onChange={e => setSortBy(e.target.value)}
                 className="px-3 py-2 text-sm rounded-lg focus:outline-none focus:ring-1 transition-all"
-                style={{ background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.10)', color: 'rgba(255,255,255,0.75)' }}>
+                style={{ background: 'rgba(240,184,0,0.06)', border: '1px solid rgba(240,184,0,0.18)', color: '#7A5C20' }}>
                 {SORT_OPTIONS.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
               </select>
-              <Button variant="outline" size="sm" className="flex items-center gap-1.5" onClick={() => setShowFilters(!showFilters)}>
+              <Button variant="outline" size="sm" className="flex items-center gap-1.5" onClick={() => setShowFilters(!showFilters)}
+                style={{ borderColor: 'rgba(240,184,0,0.30)', color: '#7A5C20' }}>
                 <SlidersHorizontal className="w-3.5 h-3.5" /> Filters
               </Button>
             </div>
           </div>
 
           {showFilters && (
-            <div className="mt-4 pt-4 grid grid-cols-2 sm:grid-cols-4 gap-3" style={{ borderTop: '1px solid rgba(255,255,255,0.07)' }}>
+            <div className="mt-4 pt-4 grid grid-cols-2 sm:grid-cols-4 gap-3" style={{ borderTop: '1px solid rgba(240,184,0,0.10)' }}>
               <div>
-                <label className="block text-xs font-medium mb-1.5" style={{ color: 'rgba(255,255,255,0.55)' }}>Min Price ($)</label>
+                <label className="block text-xs font-medium mb-1.5" style={{ color: '#9A7C40' }}>Min Price ($)</label>
                 <input type="number" placeholder="0" value={priceMin} onChange={e => setPriceMin(e.target.value)}
                   className="w-full px-3 py-2 text-sm rounded-lg focus:outline-none focus:ring-1"
-                  style={{ background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.10)', color: 'rgba(255,255,255,0.85)' }} />
+                  style={{ background: 'rgba(240,184,0,0.06)', border: '1px solid rgba(240,184,0,0.18)', color: '#1A1000' }} />
               </div>
               <div>
-                <label className="block text-xs font-medium mb-1.5" style={{ color: 'rgba(255,255,255,0.55)' }}>Max Price ($)</label>
+                <label className="block text-xs font-medium mb-1.5" style={{ color: '#9A7C40' }}>Max Price ($)</label>
                 <input type="number" placeholder="100000" value={priceMax} onChange={e => setPriceMax(e.target.value)}
                   className="w-full px-3 py-2 text-sm rounded-lg focus:outline-none focus:ring-1"
-                  style={{ background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.10)', color: 'rgba(255,255,255,0.85)' }} />
+                  style={{ background: 'rgba(240,184,0,0.06)', border: '1px solid rgba(240,184,0,0.18)', color: '#1A1000' }} />
               </div>
             </div>
           )}
@@ -127,16 +128,16 @@ export default function Marketplace() {
           <button onClick={() => setSelectedCategory('all')}
             className="flex-shrink-0 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors whitespace-nowrap"
             style={selectedCategory === 'all'
-              ? { background: 'rgba(255,224,0,0.16)', color: '#FFE000', border: '1px solid rgba(255,224,0,0.28)' }
-              : { background: 'rgba(255,255,255,0.07)', color: 'rgba(255,255,255,0.50)', border: '1px solid rgba(255,255,255,0.10)' }}>
+              ? { background: 'rgba(240,184,0,0.18)', color: '#B87000', border: '1px solid rgba(240,184,0,0.40)' }
+              : { background: 'rgba(240,184,0,0.06)', color: '#7A5C20', border: '1px solid rgba(240,184,0,0.14)' }}>
             All
           </button>
           {categories.map(cat => (
             <button key={cat.id} onClick={() => setSelectedCategory(cat.slug)}
               className="flex-shrink-0 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors whitespace-nowrap"
               style={selectedCategory === cat.slug
-                ? { background: 'rgba(255,224,0,0.16)', color: '#FFE000', border: '1px solid rgba(255,224,0,0.28)' }
-                : { background: 'rgba(255,255,255,0.07)', color: 'rgba(255,255,255,0.50)', border: '1px solid rgba(255,255,255,0.10)' }}>
+                ? { background: 'rgba(240,184,0,0.18)', color: '#B87000', border: '1px solid rgba(240,184,0,0.40)' }
+                : { background: 'rgba(240,184,0,0.06)', color: '#7A5C20', border: '1px solid rgba(240,184,0,0.14)' }}>
               {cat.name}
             </button>
           ))}
@@ -145,24 +146,24 @@ export default function Marketplace() {
         <div className="flex gap-6">
           {/* Sidebar Categories */}
           <aside className="hidden lg:block w-48 flex-shrink-0">
-            <div className="sticky top-24 rounded-xl p-4" style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.09)' }}>
-              <h3 className="font-heading font-semibold text-xs uppercase tracking-wider mb-3" style={{ color: 'rgba(255,255,255,0.45)' }}>Categories</h3>
+            <div className="sticky top-24 rounded-xl p-4" style={{ background: 'rgba(240,184,0,0.05)', border: '1px solid rgba(240,184,0,0.12)' }}>
+              <h3 className="font-heading font-semibold text-xs uppercase tracking-wider mb-3" style={{ color: '#9A7C40' }}>Categories</h3>
               <div className="space-y-0.5">
                 <button onClick={() => setSelectedCategory('all')}
                   className="w-full text-left px-3 py-2 rounded-lg text-sm transition-colors"
                   style={selectedCategory === 'all'
-                    ? { background: 'rgba(255,224,0,0.16)', color: '#FFE000', border: '1px solid rgba(255,224,0,0.28)' }
-                    : { color: 'rgba(255,255,255,0.48)' }}>
+                    ? { background: 'rgba(240,184,0,0.18)', color: '#B87000', border: '1px solid rgba(240,184,0,0.40)' }
+                    : { color: '#7A5C20' }}>
                   All Categories
                 </button>
                 {categories.map(cat => (
                   <button key={cat.id} onClick={() => setSelectedCategory(cat.slug)}
                     className="w-full text-left px-3 py-2 rounded-lg text-sm transition-colors flex items-center justify-between"
                     style={selectedCategory === cat.slug
-                      ? { background: 'rgba(255,224,0,0.16)', color: '#FFE000', border: '1px solid rgba(255,224,0,0.28)' }
-                      : { color: 'rgba(255,255,255,0.48)' }}>
+                      ? { background: 'rgba(240,184,0,0.18)', color: '#B87000', border: '1px solid rgba(240,184,0,0.40)' }
+                      : { color: '#7A5C20' }}>
                     <span>{cat.name}</span>
-                    <span className="text-[10px]" style={{ color: selectedCategory === cat.slug ? 'rgba(255,224,0,0.65)' : 'rgba(255,255,255,0.28)' }}>{cat.listingCount}</span>
+                    <span className="text-[10px]" style={{ color: selectedCategory === cat.slug ? 'rgba(184,112,0,0.65)' : 'rgba(122,92,32,0.50)' }}>{cat.listingCount}</span>
                   </button>
                 ))}
               </div>
