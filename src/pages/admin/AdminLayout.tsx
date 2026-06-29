@@ -17,7 +17,8 @@ export default function AdminLayout() {
   return (
     <div className="flex min-h-screen" style={{ background: '#FFFDF5' }}>
       <AdminSidebar />
-      <main className="flex-1 overflow-auto">
+      {/* pt-14 on mobile to clear the hamburger button */}
+      <main className="flex-1 overflow-auto pt-14 lg:pt-0">
         <Outlet />
       </main>
     </div>

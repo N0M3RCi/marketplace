@@ -532,8 +532,8 @@ const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
                         <th className="text-left px-5 py-3 text-xs font-semibold uppercase tracking-wider" style={{ color: '#9A7C40' }}>User</th>
                         <th className="text-left px-4 py-3 text-xs font-semibold uppercase tracking-wider" style={{ color: '#9A7C40' }}>Role</th>
                         <th className="text-left px-4 py-3 text-xs font-semibold uppercase tracking-wider" style={{ color: '#9A7C40' }}>Status</th>
-                        <th className="text-left px-4 py-3 text-xs font-semibold uppercase tracking-wider hidden lg:table-cell" style={{ color: '#9A7C40' }}>Tx / Rating</th>
-                        <th className="text-left px-4 py-3 text-xs font-semibold uppercase tracking-wider hidden md:table-cell" style={{ color: '#9A7C40' }}>Joined</th>
+                        <th className="text-left px-4 py-3 text-xs font-semibold uppercase tracking-wider" style={{ color: '#9A7C40' }}>Tx / Rating</th>
+                        <th className="text-left px-4 py-3 text-xs font-semibold uppercase tracking-wider" style={{ color: '#9A7C40' }}>Joined</th>
                         <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wider text-right" style={{ color: '#9A7C40' }}>Actions</th>
                       </tr>
                     </thead>
@@ -584,11 +584,11 @@ const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
                                 <StatusIcon className="w-3 h-3" />{sc.label}
                               </span>
                             </td>
-                            <td className="px-4 py-3.5 hidden lg:table-cell">
+                            <td className="px-4 py-3.5">
                               <p className="text-xs" style={{ color: '#7A5C30' }}>{u.totalTransactions} tx</p>
                               <p className="text-[11px] text-amber-400">★ {u.rating.toFixed(1)}</p>
                             </td>
-                            <td className="px-4 py-3.5 text-xs hidden md:table-cell" style={{ color: '#9A7C40' }}>
+                            <td className="px-4 py-3.5 text-xs" style={{ color: '#9A7C40' }}>
                               {u.createdAt ? formatDate(u.createdAt) : '—'}
                             </td>
                             <td className="px-4 py-3.5 text-right">
@@ -629,7 +629,7 @@ const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
             </div>
           </div>
 
-          {/* Edit Panel */}
+          {/* Edit Panel - Desktop sidebar */}
           {selectedUser && (
             <div className="w-[420px] flex-shrink-0 hidden lg:block">
               <div className="rounded-2xl overflow-hidden sticky top-8" style={{ background: 'rgba(200,160,60,0.08)', border: '1px solid rgba(200,160,60,0.16)', backdropFilter: 'blur(20px)' }}>
@@ -837,7 +837,218 @@ const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
               </div>
             </div>
           )}
-        {/* Delete Confirmation Modal */}
+
+          {/* Mobile Edit Panel Modal */}
+          {selectedUser && (
+            <div className="fixed inset-0 z-50 flex flex-col lg:hidden" style={{ background: 'rgba(0,0,0,0.50)', backdropFilter: 'blur(8px)' }}>
+              <div className="flex-1 overflow-y-auto m-4 rounded-2xl" style={{ background: '#FFFDF5', border: '1px solid rgba(200,160,60,0.20)', boxShadow: '0 32px 100px rgba(0,0,0,0.40)' }}>
+                {/* Header */}
+                <div className="px-5 py-4 flex items-center justify-between sticky top-0 z-10" style={{ background: '#FFFDF5', borderBottom: '1px solid rgba(200,160,60,0.15)' }}>
+                  <div className="flex items-center gap-3">
+                    <div className="w-11 h-11 rounded-full overflow-hidden border-2 flex-shrink-0" style={{ borderColor: 'rgba(200,160,60,0.35)' }}>
+                      {selectedUser.avatarUrl ? (
+                        <img src={selectedUser.avatarUrl} alt="" className="w-full h-full object-cover" />
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center font-bold text-sm" style={{ background: 'rgba(200,160,60,0.20)', color: '#C68000' }}>
+                          {getInitials(selectedUser.username)}
+                        </div>
+                      )}
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-1.5">
+                        <p className="font-heading font-bold text-sm" style={{ color: '#2A1A00' }}>{selectedUser.username}</p>
+                        {selectedUser.role === 'admin' && <Crown className="w-3.5 h-3.5" style={{ color: '#C68000' }} />}
+                        {selectedUser.isVerified && <ShieldCheck className="w-3.5 h-3.5" style={{ color: 'rgba(52,211,153,0.80)' }} />}
+                      </div>
+                      <p className="text-[11px]" style={{ color: '#9A7C40' }}>{selectedUser.email}</p>
+                    </div>
+                  </div>
+                  <button onClick={closePanel} className="p-1.5 rounded-lg transition-colors" style={{ color: '#9A7C40' }}
+                    onMouseEnter={e => (e.currentTarget as HTMLElement).style.color = '#2A1A00'}
+                    onMouseLeave={e => (e.currentTarget as HTMLElement).style.color = '#9A7C40'}>
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+
+                {/* Stats */}
+                <div className="grid grid-cols-3" style={{ borderBottom: '1px solid rgba(200,160,60,0.10)' }}>
+                  {[
+                    { label: 'Transactions', value: selectedUser.totalTransactions },
+                    { label: 'Rating',       value: `★ ${selectedUser.rating.toFixed(1)}` },
+                    { label: 'Joined',       value: selectedUser.createdAt ? formatDate(selectedUser.createdAt).split(',')[0] : '—' },
+                  ].map(s => (
+                    <div key={s.label} className="px-4 py-3 text-center" style={{ borderRight: '1px solid rgba(200,160,60,0.10)' }}>
+                      <p className="font-bold text-sm" style={{ color: '#2A1A00' }}>{s.value}</p>
+                      <p className="text-[10px] mt-0.5" style={{ color: '#B8A070' }}>{s.label}</p>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Form */}
+                <div className="p-5 space-y-4">
+                  <h3 className="font-heading font-semibold text-sm flex items-center gap-2" style={{ color: '#4A3000' }}>
+                    <Edit2 className="w-4 h-4" style={{ color: '#9A7C40' }} /> Edit Profile
+                  </h3>
+
+                  <div>
+                    <label className="block text-xs font-medium mb-1.5" style={{ color: '#9A7C40' }}>Username</label>
+                    <div className="relative">
+                      <User className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5" style={{ color: '#B8A070' }} />
+                      <input value={editForm.username} onChange={e => setEditForm(f => ({ ...f, username: e.target.value }))}
+                        className="w-full pl-9 pr-3 py-2.5 text-sm rounded-xl focus:outline-none transition-all"
+                        style={{ background: 'rgba(200,160,60,0.10)', border: '1px solid rgba(200,160,60,0.15)', color: '#4A3010' }}
+                        placeholder="Username" />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-medium mb-1.5" style={{ color: '#9A7C40' }}>Email (read-only)</label>
+                    <div className="relative">
+                      <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5" style={{ color: '#C8B090' }} />
+                      <input value={selectedUser.email} disabled
+                        className="w-full pl-9 pr-3 py-2.5 text-sm rounded-xl cursor-not-allowed"
+                        style={{ background: 'rgba(200,160,60,0.05)', border: '1px solid rgba(200,160,60,0.10)', color: '#B8A070' }} />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-medium mb-1.5" style={{ color: '#9A7C40' }}>Phone</label>
+                    <div className="relative">
+                      <Phone className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5" style={{ color: '#B8A070' }} />
+                      <input value={editForm.phone} onChange={e => setEditForm(f => ({ ...f, phone: e.target.value }))}
+                        className="w-full pl-9 pr-3 py-2.5 text-sm rounded-xl focus:outline-none transition-all"
+                        style={{ background: 'rgba(200,160,60,0.10)', border: '1px solid rgba(200,160,60,0.15)', color: '#4A3010' }}
+                        placeholder="+1 234 567 890" />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-medium mb-2" style={{ color: '#9A7C40' }}>Role</label>
+                    <div className="grid grid-cols-2 gap-2">
+                      {Object.entries(ROLE_CONFIG).map(([k, v]) => (
+                        <button key={k} type="button" onClick={() => setEditForm(f => ({ ...f, role: k }))}
+                          className={cn('flex items-center gap-2 px-3 py-2.5 rounded-xl text-xs font-medium text-left transition-all border', v.bg, v.color)}
+                          style={editForm.role === k ? { outline: '2px solid rgba(200,160,60,0.60)', outlineOffset: '1px', opacity: 1 } : { opacity: 0.55 }}>
+                          {k === 'admin' && <Crown className="w-3.5 h-3.5 flex-shrink-0" />}
+                          {k === 'buyer' && <User className="w-3.5 h-3.5 flex-shrink-0" />}
+                          {k === 'seller' && <Star className="w-3.5 h-3.5 flex-shrink-0" />}
+                          {k === 'both'   && <ShieldCheck className="w-3.5 h-3.5 flex-shrink-0" />}
+                          {v.label}
+                          {editForm.role === k && <CheckCircle className="w-3 h-3 ml-auto flex-shrink-0" />}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-medium mb-2" style={{ color: '#9A7C40' }}>Account Status</label>
+                    <div className="space-y-2">
+                      {Object.entries(STATUS_CONFIG).map(([k, v]) => {
+                        const Icon = v.icon;
+                        const isSel = editForm.status === k;
+                        return (
+                          <button key={k} type="button" onClick={() => setEditForm(f => ({ ...f, status: k as any }))}
+                            className="w-full flex items-center gap-3 px-3.5 py-3 rounded-xl text-left transition-all"
+                            style={isSel
+                              ? { background: k === 'active' ? 'rgba(52,211,153,0.12)' : k === 'blocked' ? 'rgba(239,68,68,0.12)' : 'rgba(245,158,11,0.12)', border: k === 'active' ? '1px solid rgba(52,211,153,0.35)' : k === 'blocked' ? '1px solid rgba(239,68,68,0.35)' : '1px solid rgba(245,158,11,0.35)' }
+                              : { background: 'rgba(200,160,60,0.06)', border: '1px solid rgba(200,160,60,0.12)', opacity: 0.65 }}>
+                            <div className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0"
+                              style={{ background: isSel ? (k === 'active' ? 'rgba(52,211,153,0.20)' : k === 'blocked' ? 'rgba(239,68,68,0.20)' : 'rgba(245,158,11,0.20)') : 'rgba(200,160,60,0.12)' }}>
+                              <Icon className="w-4 h-4" style={{ color: isSel ? (k === 'active' ? 'rgba(52,211,153,0.90)' : k === 'blocked' ? 'rgba(252,165,165,0.90)' : 'rgba(251,191,36,0.90)') : '#9A7C40' }} />
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <p className="text-xs font-semibold" style={{ color: isSel ? (k === 'active' ? 'rgba(52,211,153,0.95)' : k === 'blocked' ? 'rgba(252,165,165,0.95)' : 'rgba(251,191,36,0.95)') : '#7A5C30' }}>{v.label}</p>
+                              <p className="text-[11px] mt-0.5" style={{ color: '#B8A070' }}>{v.desc}</p>
+                            </div>
+                            {isSel && (
+                              <div className="w-4 h-4 rounded-full flex items-center justify-center flex-shrink-0"
+                                style={{ background: k === 'active' ? 'rgba(52,211,153,0.25)' : k === 'blocked' ? 'rgba(239,68,68,0.25)' : 'rgba(245,158,11,0.25)' }}>
+                                <div className="w-2 h-2 rounded-full" style={{ background: k === 'active' ? '#34d399' : k === 'blocked' ? '#f87171' : '#fbbf24' }} />
+                              </div>
+                            )}
+                          </button>
+                        );
+                      })}
+                    </div>
+                    {editForm.status === 'blocked' && <p className="mt-2 text-[11px] px-2" style={{ color: 'rgba(252,165,165,0.70)' }}>⚠ Blocked users cannot log in.</p>}
+                    {editForm.status === 'restricted' && <p className="mt-2 text-[11px] px-2" style={{ color: 'rgba(251,191,36,0.70)' }}>⚠ Restricted users can browse but cannot transact.</p>}
+                  </div>
+
+                  <div className="flex items-center justify-between p-3.5 rounded-xl" style={{ background: 'rgba(200,160,60,0.06)', border: '1px solid rgba(200,160,60,0.12)' }}>
+                    <div className="flex items-center gap-2.5">
+                      <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: editForm.isVerified ? 'rgba(52,211,153,0.15)' : 'rgba(200,160,60,0.12)' }}>
+                        <ShieldCheck className="w-4 h-4" style={{ color: editForm.isVerified ? 'rgba(52,211,153,0.85)' : '#B8A070' }} />
+                      </div>
+                      <div>
+                        <p className="text-xs font-medium" style={{ color: '#4A3000' }}>Identity Verified</p>
+                        <p className="text-[11px]" style={{ color: '#B8A070' }}>KYC / manual verification</p>
+                      </div>
+                    </div>
+                    <button onClick={() => setEditForm(f => ({ ...f, isVerified: !f.isVerified }))}
+                      className="w-10 h-6 rounded-full transition-colors relative flex-shrink-0"
+                      style={{ background: editForm.isVerified ? 'rgba(52,211,153,0.70)' : '#C8B090' }}>
+                      <div className={cn('absolute top-0.5 w-5 h-5 rounded-full bg-white shadow transition-all', editForm.isVerified ? 'left-[18px]' : 'left-0.5')} />
+                    </button>
+                  </div>
+
+                  <div className="flex items-center gap-2 px-3 py-2.5 rounded-xl" style={{ background: 'rgba(200,160,60,0.05)', border: '1px solid rgba(200,160,60,0.10)' }}>
+                    <Hash className="w-3.5 h-3.5 flex-shrink-0" style={{ color: '#C8B090' }} />
+                    <span className="text-[11px] font-mono truncate" style={{ color: '#B8A070' }}>{selectedUser.id}</span>
+                  </div>
+
+                  <div className="flex gap-2 pt-1">
+                    <button onClick={handleSave} disabled={saving}
+                      className="flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl text-sm font-semibold transition-all"
+                      style={{ background: 'rgba(200,160,60,0.18)', border: '1px solid rgba(200,160,60,0.35)', color: '#C68000' }}
+                      onMouseEnter={e => (e.currentTarget as HTMLButtonElement).style.background = 'rgba(200,160,60,0.28)'}
+                      onMouseLeave={e => (e.currentTarget as HTMLButtonElement).style.background = 'rgba(200,160,60,0.18)'}>
+                      {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+                      Save Changes
+                    </button>
+                    <button onClick={closePanel}
+                      className="px-4 py-2.5 rounded-xl text-sm transition-all"
+                      style={{ background: 'rgba(200,160,60,0.10)', border: '1px solid rgba(200,160,60,0.15)', color: '#8A6C40' }}
+                      onMouseEnter={e => (e.currentTarget as HTMLButtonElement).style.background = 'rgba(200,160,60,0.15)'}
+                      onMouseLeave={e => (e.currentTarget as HTMLButtonElement).style.background = 'rgba(200,160,60,0.10)'}>
+                      Cancel
+                    </button>
+                  </div>
+                  <p className="text-[10px] text-center" style={{ color: '#C8B090' }}>All changes are logged in the audit trail</p>
+
+                  {/* Danger Zone */}
+                  <div className="pt-2 border-t" style={{ borderColor: 'rgba(239,68,68,0.15)' }}>
+                    {confirmDelete === selectedUser.id ? (
+                      <div className="p-3 rounded-xl" style={{ background: 'rgba(239,68,68,0.10)', border: '1px solid rgba(239,68,68,0.25)' }}>
+                        <p className="text-xs font-semibold" style={{ color: 'rgba(252,165,165,0.90)' }}>Delete this user permanently?</p>
+                        <p className="text-[11px] mt-1" style={{ color: 'rgba(252,165,165,0.65)' }}>This cannot be undone. The user must have no active escrow cases or listings.</p>
+                        <div className="flex gap-2 mt-3">
+                          <button onClick={() => handleDelete(selectedUser.id)} disabled={deleting}
+                            className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-xs font-semibold transition-all"
+                            style={{ background: 'rgba(239,68,68,0.20)', border: '1px solid rgba(239,68,68,0.35)', color: 'rgba(252,165,165,0.90)' }}>
+                            {deleting ? <Loader2 className="w-3 h-3 animate-spin" /> : <Trash2 className="w-3 h-3" />}
+                            {deleting ? 'Deleting...' : 'Yes, Delete'}
+                          </button>
+                          <button onClick={() => setConfirmDelete(null)}
+                            className="px-4 py-2 rounded-lg text-xs transition-all"
+                            style={{ background: 'rgba(200,160,60,0.10)', border: '1px solid rgba(200,160,60,0.15)', color: '#8A6C40' }}>
+                            Cancel
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <button onClick={() => setConfirmDelete(selectedUser.id)}
+                        className="w-full flex items-center justify-center gap-1.5 py-2.5 rounded-xl text-xs font-semibold transition-all"
+                        style={{ background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.20)', color: 'rgba(252,165,165,0.85)' }}
+                        onMouseEnter={e => (e.currentTarget as HTMLButtonElement).style.background = 'rgba(239,68,68,0.15)'}
+                        onMouseLeave={e => (e.currentTarget as HTMLButtonElement).style.background = 'rgba(239,68,68,0.08)'}>
+                        <Trash2 className="w-3.5 h-3.5" /> Delete User
+                      </button>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
       {confirmDelete && !selectedUser && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ backdropFilter: 'blur(8px)', background: 'rgba(0,0,0,0.50)' }}>
           <div className="w-full max-w-sm rounded-2xl overflow-hidden bg-white shadow-2xl border border-border">

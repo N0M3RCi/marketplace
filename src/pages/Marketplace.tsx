@@ -122,6 +122,26 @@ export default function Marketplace() {
       </div>
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+        {/* Mobile category filter row */}
+        <div className="flex lg:hidden gap-2 overflow-x-auto pb-3 mb-4 scrollbar-thin -mx-4 px-4" style={{ scrollbarWidth: 'none' }}>
+          <button onClick={() => setSelectedCategory('all')}
+            className="flex-shrink-0 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors whitespace-nowrap"
+            style={selectedCategory === 'all'
+              ? { background: 'rgba(255,224,0,0.16)', color: '#FFE000', border: '1px solid rgba(255,224,0,0.28)' }
+              : { background: 'rgba(255,255,255,0.07)', color: 'rgba(255,255,255,0.50)', border: '1px solid rgba(255,255,255,0.10)' }}>
+            All
+          </button>
+          {categories.map(cat => (
+            <button key={cat.id} onClick={() => setSelectedCategory(cat.slug)}
+              className="flex-shrink-0 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors whitespace-nowrap"
+              style={selectedCategory === cat.slug
+                ? { background: 'rgba(255,224,0,0.16)', color: '#FFE000', border: '1px solid rgba(255,224,0,0.28)' }
+                : { background: 'rgba(255,255,255,0.07)', color: 'rgba(255,255,255,0.50)', border: '1px solid rgba(255,255,255,0.10)' }}>
+              {cat.name}
+            </button>
+          ))}
+        </div>
+
         <div className="flex gap-6">
           {/* Sidebar Categories */}
           <aside className="hidden lg:block w-48 flex-shrink-0">

@@ -325,7 +325,7 @@ export default function Index() {
       <Navbar />
 
       {/* ─── Hero Section ─── */}
-      <section className="relative overflow-hidden min-h-[700px] lg:min-h-[780px] flex items-center">
+      <section className="relative overflow-hidden min-h-[600px] lg:min-h-[780px] flex items-center">
         <LiquidGlassBackground />
 
         {/* Bottom fade to cream */}
@@ -557,9 +557,9 @@ export default function Index() {
               const Icon = b.icon;
               return (
                 <div key={b.label}
-                className="flex items-center gap-3.5 py-5 px-6"
+                className="flex items-center gap-2 sm:gap-3.5 py-4 sm:py-5 px-3 sm:px-6"
                 style={{ borderRight: idx < TRUST_BADGES.length - 1 ? '1px solid rgba(240,184,0,0.14)' : 'none' }}>
-                  <div className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0"
+                  <div className="w-7 h-7 sm:w-9 sm:h-9 rounded-xl flex items-center justify-center flex-shrink-0"
                   style={{ background: 'rgba(240,184,0,0.14)', border: '1px solid rgba(240,184,0,0.30)' }}>
                     <Icon className="w-4 h-4" style={{ color: '#B87000' }} />
                   </div>

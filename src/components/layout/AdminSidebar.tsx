@@ -1,8 +1,10 @@
+import { useState } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
 import {
   LayoutDashboard, Users, ListChecks, FolderOpen, Wallet, Scale,
   ShieldCheck, Truck, AlertTriangle, Banknote, BarChart3, FileText,
-  ChevronRight, Shield, Bitcoin, MessageSquare, FolderKanban, Star, LayoutGrid, Upload
+  ChevronRight, Shield, Bitcoin, MessageSquare, FolderKanban, Star, LayoutGrid, Upload,
+  Menu, X
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -29,15 +31,14 @@ const navItems = [
 
 export default function AdminSidebar() {
   const location = useLocation();
+  const [mobileOpen, setMobileOpen] = useState(false);
 
-  return (
-    <aside className="w-64 flex-shrink-0 min-h-screen flex flex-col" style={{
+  const sidebarContent = (
+    <div className="flex flex-col h-full" style={{
       background: 'rgba(255,253,240,0.96)',
-      borderRight: '1px solid rgba(240,184,0,0.22)',
-      boxShadow: '2px 0 20px rgba(180,130,0,0.06)',
     }}>
       {/* Logo */}
-      <div className="px-6 py-5" style={{ borderBottom: '1px solid rgba(240,184,0,0.18)' }}>
+      <div className="flex items-center justify-between px-4 py-4 lg:px-6 lg:py-5" style={{ borderBottom: '1px solid rgba(240,184,0,0.18)' }}>
         <div className="flex items-center gap-2.5">
           <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{
             background: 'linear-gradient(135deg, rgba(240,184,0,0.30) 0%, rgba(220,160,0,0.50) 100%)',
@@ -53,6 +54,9 @@ export default function AdminSidebar() {
             <p className="text-[10px] -mt-0.5" style={{ color: '#9A7C40' }}>Admin Panel</p>
           </div>
         </div>
+        <button onClick={() => setMobileOpen(false)} className="lg:hidden p-1 rounded-lg hover:bg-black/5 transition-colors">
+          <X className="w-5 h-5" style={{ color: '#7A5C30' }} />
+        </button>
       </div>
 
       {/* Nav */}
@@ -66,6 +70,7 @@ export default function AdminSidebar() {
             <NavLink
               key={item.path}
               to={item.path}
+              onClick={() => setMobileOpen(false)}
               className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all group"
               style={isActive
                 ? {
@@ -100,6 +105,7 @@ export default function AdminSidebar() {
       <div className="px-4 py-4" style={{ borderTop: '1px solid rgba(240,184,0,0.15)' }}>
         <NavLink
           to="/"
+          onClick={() => setMobileOpen(false)}
           className="flex items-center gap-2.5 px-3 py-2 rounded-xl text-sm transition-all"
           style={{ color: '#9A7C40' }}
           onMouseEnter={e => {
@@ -115,6 +121,47 @@ export default function AdminSidebar() {
           Back to Marketplace
         </NavLink>
       </div>
-    </aside>
+    </div>
+  );
+
+  return (
+    <>
+      {/* Mobile hamburger button */}
+      <button
+        onClick={() => setMobileOpen(true)}
+        className="lg:hidden fixed top-4 left-4 z-50 w-10 h-10 rounded-xl flex items-center justify-center shadow-lg"
+        style={{
+          background: 'linear-gradient(135deg, rgba(240,184,0,0.25) 0%, rgba(220,160,0,0.40) 100%)',
+          border: '1px solid rgba(200,140,0,0.35)',
+          color: '#7A4500',
+        }}
+      >
+        <Menu className="w-5 h-5" />
+      </button>
+
+      {/* Mobile overlay backdrop */}
+      {mobileOpen && (
+        <div
+          className="fixed inset-0 z-40 bg-black/40 lg:hidden"
+          onClick={() => setMobileOpen(false)}
+        />
+      )}
+
+      {/* Mobile drawer */}
+      <div className={cn(
+        'fixed top-0 left-0 z-50 h-full w-72 transition-transform duration-300 ease-in-out lg:hidden',
+        mobileOpen ? 'translate-x-0' : '-translate-x-full'
+      )} style={{ boxShadow: '4px 0 24px rgba(0,0,0,0.15)' }}>
+        {sidebarContent}
+      </div>
+
+      {/* Desktop sidebar */}
+      <aside className="hidden lg:flex w-64 flex-shrink-0 min-h-screen flex-col" style={{
+        borderRight: '1px solid rgba(240,184,0,0.22)',
+        boxShadow: '2px 0 20px rgba(180,130,0,0.06)',
+      }}>
+        {sidebarContent}
+      </aside>
+    </>
   );
 }

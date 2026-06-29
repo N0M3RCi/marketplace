@@ -262,10 +262,10 @@ export default function AdminCategories() {
           <td className="px-4 py-3.5">
             <code className="text-[11px] px-1.5 py-0.5 rounded" style={{ background: 'rgba(200,160,60,0.08)', color: '#9A7C40' }}>{cat.slug}</code>
           </td>
-          <td className="px-4 py-3.5 hidden sm:table-cell">
+          <td className="px-4 py-3.5">
             <span className="text-xs" style={{ color: '#7A5C30' }}>{cat.listing_count || 0}</span>
           </td>
-          <td className="px-4 py-3.5 hidden md:table-cell">
+          <td className="px-4 py-3.5">
             <div className="flex items-center gap-2">
               <div className="w-5 h-5 rounded border" style={{ background: cat.color?.replace('text-', 'bg-').replace('-600', '-200') || 'bg-gray-100', borderColor: 'rgba(200,160,60,0.20)' }} />
               <span className="text-xs" style={{ color: '#4A3010' }}>{cat.color || 'text-gray-600'}</span>
@@ -395,8 +395,8 @@ export default function AdminCategories() {
                     <tr style={{ borderBottom: '1px solid rgba(200,160,60,0.10)', background: 'rgba(200,160,60,0.05)' }}>
                       <th className="text-left px-5 py-3 text-xs font-semibold uppercase tracking-wider" style={{ color: '#9A7C40' }}>Category</th>
                       <th className="text-left px-4 py-3 text-xs font-semibold uppercase tracking-wider" style={{ color: '#9A7C40' }}>Slug</th>
-                      <th className="text-left px-4 py-3 text-xs font-semibold uppercase tracking-wider hidden sm:table-cell" style={{ color: '#9A7C40' }}>Listings</th>
-                      <th className="text-left px-4 py-3 text-xs font-semibold uppercase tracking-wider hidden md:table-cell" style={{ color: '#9A7C40' }}>Color</th>
+                      <th className="text-left px-4 py-3 text-xs font-semibold uppercase tracking-wider" style={{ color: '#9A7C40' }}>Listings</th>
+                      <th className="text-left px-4 py-3 text-xs font-semibold uppercase tracking-wider" style={{ color: '#9A7C40' }}>Color</th>
                       <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wider text-right" style={{ color: '#9A7C40' }}>Actions</th>
                     </tr>
                   </thead>
@@ -641,7 +641,183 @@ export default function AdminCategories() {
             </div>
           </div>
         )}
-      </div>
+
+        {/* Mobile Edit/Create Panel Modal */}
+        {(selectedCat || creating) && (
+          <div className="fixed inset-0 z-50 flex flex-col lg:hidden" style={{ background: 'rgba(0,0,0,0.50)', backdropFilter: 'blur(8px)' }}>
+            <div className="flex-1 overflow-y-auto m-4 rounded-2xl" style={{ background: '#FFFDF5', border: '1px solid rgba(200,160,60,0.20)', boxShadow: '0 32px 100px rgba(0,0,0,0.40)' }}>
+              <div className="px-5 py-4 flex items-center justify-between sticky top-0 z-10" style={{ background: '#FFFDF5', borderBottom: '1px solid rgba(200,160,60,0.15)' }}>
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-lg flex items-center justify-center" style={{ background: 'rgba(200,160,60,0.14)' }}>
+                    {creating ? <Plus className="w-4 h-4" style={{ color: '#C68000' }} /> : <Edit2 className="w-4 h-4" style={{ color: '#C68000' }} />}
+                  </div>
+                  <div>
+                    <p className="font-heading font-bold text-sm" style={{ color: '#2A1A00' }}>{creating ? 'New Category' : 'Edit Category'}</p>
+                    <p className="text-[11px]" style={{ color: '#9A7C40' }}>{creating ? 'Create a new listing category' : `ID: ${selectedCat?.id.substring(0, 8)}...`}</p>
+                  </div>
+                </div>
+                <button onClick={closePanel} className="p-1.5 rounded-lg transition-colors" style={{ color: '#9A7C40' }}
+                  onMouseEnter={e => (e.currentTarget as HTMLElement).style.color = '#2A1A00'}
+                  onMouseLeave={e => (e.currentTarget as HTMLElement).style.color = '#9A7C40'}>
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+
+              {!creating && selectedCat && (
+                <div className="grid grid-cols-3" style={{ borderBottom: '1px solid rgba(200,160,60,0.10)' }}>
+                  {[
+                    { label: 'Listings', value: selectedCat.listing_count || 0 },
+                    { label: 'Slug', value: selectedCat.slug || '—' },
+                    { label: 'Icon', value: selectedCat.icon || 'Tag' },
+                  ].map(s => (
+                    <div key={s.label} className="px-4 py-3 text-center" style={{ borderRight: '1px solid rgba(200,160,60,0.10)' }}>
+                      <p className="font-bold text-sm" style={{ color: '#2A1A00' }}>{s.value}</p>
+                      <p className="text-[10px] mt-0.5" style={{ color: '#B8A070' }}>{s.label}</p>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              <div className="p-5 space-y-4">
+                <div>
+                  <label className="block text-xs font-medium mb-1.5" style={{ color: '#9A7C40' }}>Parent Category</label>
+                  <div className="relative">
+                    <ChevronDown className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5" style={{ color: '#B8A070' }} />
+                    <select value={editForm.parentId} onChange={e => setEditForm(f => ({ ...f, parentId: e.target.value }))}
+                      className="w-full pl-9 pr-3 py-2.5 text-sm rounded-xl focus:outline-none transition-all appearance-none"
+                      style={{ background: 'rgba(200,160,60,0.10)', border: '1px solid rgba(200,160,60,0.15)', color: '#4A3010' }}>
+                      <option value="">— Top-Level Category —</option>
+                      {rootCategories.map(cat => renderParentOption(cat, 0))}
+                    </select>
+                  </div>
+                  <p className="text-[10px] mt-1" style={{ color: '#C8B090' }}>Leave empty for a top-level category</p>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-medium mb-1.5" style={{ color: '#9A7C40' }}>Name *</label>
+                  <div className="relative">
+                    <FileText className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5" style={{ color: '#B8A070' }} />
+                    <input value={editForm.name} onChange={e => handleNameChange(e.target.value)}
+                      className="w-full pl-9 pr-3 py-2.5 text-sm rounded-xl focus:outline-none transition-all"
+                      style={{ background: 'rgba(200,160,60,0.10)', border: '1px solid rgba(200,160,60,0.15)', color: '#4A3010' }}
+                      placeholder="e.g. Helmet" />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-medium mb-1.5" style={{ color: '#9A7C40' }}>Slug</label>
+                  <div className="relative">
+                    <Hash className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5" style={{ color: '#B8A070' }} />
+                    <input value={editForm.slug} onChange={e => setEditForm(f => ({ ...f, slug: e.target.value }))}
+                      className="w-full pl-9 pr-3 py-2.5 text-sm rounded-xl focus:outline-none transition-all"
+                      style={{ background: 'rgba(200,160,60,0.10)', border: '1px solid rgba(200,160,60,0.15)', color: '#4A3010' }}
+                      placeholder="Auto-generated from name" />
+                  </div>
+                  <p className="text-[10px] mt-1" style={{ color: '#C8B090' }}>Leave empty for auto-generation</p>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-medium mb-1.5" style={{ color: '#9A7C40' }}>Icon</label>
+                  <div className="flex flex-wrap gap-2">
+                    {ICONS.map(icon => (
+                      <button key={icon} type="button" onClick={() => setEditForm(f => ({ ...f, icon }))}
+                        className={cn('w-9 h-9 rounded-lg flex items-center justify-center transition-all border text-xs', editForm.icon === icon
+                          ? 'border-amber-500 bg-amber-50 text-amber-700'
+                          : 'border-transparent text-gray-500')}
+                        style={editForm.icon === icon
+                          ? { background: 'rgba(200,160,60,0.18)', border: '1px solid rgba(200,160,60,0.40)', color: '#C68000' }
+                          : { background: 'rgba(200,160,60,0.06)', color: '#9A7C40' }}
+                        title={icon}>
+                        {icon.substring(0, 3)}
+                      </button>
+                    ))}
+                  </div>
+                  <input value={editForm.icon} onChange={e => setEditForm(f => ({ ...f, icon: e.target.value }))}
+                    className="w-full mt-2 px-3 py-2 text-xs rounded-lg focus:outline-none"
+                    style={{ background: 'rgba(200,160,60,0.08)', border: '1px solid rgba(200,160,60,0.12)', color: '#4A3010' }}
+                    placeholder="Or type icon name" />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-medium mb-1.5" style={{ color: '#9A7C40' }}>Color</label>
+                  <div className="flex flex-wrap gap-2">
+                    {COLORS.map(c => (
+                      <button key={c.value} type="button" onClick={() => setEditForm(f => ({ ...f, color: c.value }))}
+                        className={cn('w-9 h-9 rounded-lg transition-all flex items-center justify-center text-[10px] font-bold border')}
+                        style={{
+                          background: editForm.color === c.value ? c.bg : 'rgba(200,160,60,0.06)',
+                          border: editForm.color === c.value ? '2px solid rgba(200,160,60,0.50)' : '1px solid rgba(200,160,60,0.12)',
+                          color: c.value,
+                        }}
+                        title={c.label}>
+                        {c.label.substring(0, 2)}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div>
+                  <div className="flex gap-3">
+                    <button onClick={handleSave} disabled={saving}
+                      className="flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl text-sm font-semibold transition-all"
+                      style={{ background: 'rgba(200,160,60,0.18)', border: '1px solid rgba(200,160,60,0.35)', color: '#C68000' }}
+                      onMouseEnter={e => (e.currentTarget as HTMLButtonElement).style.background = 'rgba(200,160,60,0.28)'}
+                      onMouseLeave={e => (e.currentTarget as HTMLButtonElement).style.background = 'rgba(200,160,60,0.18)'}>
+                      {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : creating ? <Plus className="w-4 h-4" /> : <Save className="w-4 h-4" />}
+                      {creating ? 'Create Category' : 'Save Changes'}
+                    </button>
+                    <button onClick={closePanel}
+                      className="px-4 py-2.5 rounded-xl text-sm transition-all"
+                      style={{ background: 'rgba(200,160,60,0.10)', border: '1px solid rgba(200,160,60,0.15)', color: '#8A6C40' }}
+                      onMouseEnter={e => (e.currentTarget as HTMLButtonElement).style.background = 'rgba(200,160,60,0.15)'}
+                      onMouseLeave={e => (e.currentTarget as HTMLButtonElement).style.background = 'rgba(200,160,60,0.10)'}>
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+
+                {/* Delete (only for existing categories) */}
+                {!creating && selectedCat && (
+                  <div className="pt-2" style={{ borderTop: '1px solid rgba(200,160,60,0.10)' }}>
+                    {!showDeleteConfirm ? (
+                      <button onClick={() => setShowDeleteConfirm(true)}
+                        className="w-full flex items-center justify-center gap-1.5 py-2.5 rounded-xl text-sm transition-all"
+                        style={{ background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.18)', color: 'rgba(252,165,165,0.85)' }}
+                        onMouseEnter={e => (e.currentTarget as HTMLButtonElement).style.background = 'rgba(239,68,68,0.15)'}
+                        onMouseLeave={e => (e.currentTarget as HTMLButtonElement).style.background = 'rgba(239,68,68,0.08)'}>
+                        <Trash2 className="w-4 h-4" /> Delete Category
+                      </button>
+                    ) : (
+                      <div className="space-y-2">
+                        <p className="text-xs text-center" style={{ color: 'rgba(252,165,165,0.85)' }}>
+                          Are you sure? This cannot be undone.
+                          {hasChildren(selectedCat.id) && (
+                            <span className="block mt-1" style={{ color: 'rgba(251,191,36,0.85)' }}>⚠ This category has subcategories.</span>
+                          )}
+                          {selectedCat.listing_count > 0 && (
+                            <span className="block mt-1" style={{ color: 'rgba(251,191,36,0.85)' }}>⚠ This category has {selectedCat.listing_count} listing{selectedCat.listing_count !== 1 ? 's' : ''}.</span>
+                          )}
+                        </p>
+                        <div className="flex gap-2">
+                          <button onClick={handleDelete} disabled={deleting}
+                            className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl text-sm font-semibold transition-all"
+                            style={{ background: 'rgba(239,68,68,0.15)', border: '1px solid rgba(239,68,68,0.30)', color: 'rgba(252,165,165,0.90)' }}>
+                            {deleting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />} Delete
+                          </button>
+                          <button onClick={() => setShowDeleteConfirm(false)}
+                            className="flex-1 py-2 rounded-xl text-sm transition-all"
+                            style={{ background: 'rgba(200,160,60,0.10)', border: '1px solid rgba(200,160,60,0.15)', color: '#8A6C40' }}>
+                            Cancel
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
     </div>
   );
 }

@@ -237,7 +237,7 @@ export default function AdminDashboard() {
             Manage all <ChevronRight className="w-3 h-3" />
           </Link>
         </div>
-        <div className="grid grid-cols-4 gap-3">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
           {escrowStats.map(s => (
             <div key={s.label} className="rounded-xl p-4 text-center" style={{ background: 'rgba(250,245,235,0.60)', border: '1px solid rgba(200,160,60,0.12)' }}>
               <p className="text-2xl font-bold font-heading" style={{ color: '#C68000' }}>{s.value}</p>

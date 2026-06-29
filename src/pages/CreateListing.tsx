@@ -239,7 +239,7 @@ export default function CreateListing() {
                   {idx < step ? <CheckCircle className="w-4 h-4" /> : idx + 1}
                 </div>
                 <span
-                  className="text-[10px] mt-1 font-medium hidden sm:block"
+                  className="text-[10px] mt-1 font-medium"
                   style={idx === step ? { color: 'rgba(255,215,60,0.85)' } : idx < step ? { color: 'rgba(255,215,60,0.55)' } : { color: 'rgba(255,255,255,0.30)' }}
                 >{label}</span>
               </div>

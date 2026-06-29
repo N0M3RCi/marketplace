@@ -838,7 +838,7 @@ export default function EscrowCaseDetail() {
                   {escrowCase.sellerItemPhotos.length > 0 && (
                     <div>
                       <p className="text-xs font-semibold mb-2">Item Photos ({escrowCase.sellerItemPhotos.length})</p>
-                      <div className="grid grid-cols-4 gap-2">
+                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                         {escrowCase.sellerItemPhotos.map((url, i) => (
                           <a key={i} href={url} target="_blank" rel="noopener noreferrer"
                             className="aspect-square rounded-xl overflow-hidden border border-border">
@@ -851,7 +851,7 @@ export default function EscrowCaseDetail() {
                   {escrowCase.sellerPackagingPhotos.length > 0 && (
                     <div>
                       <p className="text-xs font-semibold mb-2">Packaging Photos ({escrowCase.sellerPackagingPhotos.length})</p>
-                      <div className="grid grid-cols-4 gap-2">
+                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                         {escrowCase.sellerPackagingPhotos.map((url, i) => (
                           <a key={i} href={url} target="_blank" rel="noopener noreferrer"
                             className="aspect-square rounded-xl overflow-hidden border border-border">
@@ -1120,7 +1120,7 @@ function FileUploadArea({ files, accept, label, onAdd, onRemove }: {
         </div>
       </label>
       {files.length > 0 && (
-        <div className="grid grid-cols-5 gap-2 mt-2">
+        <div className="grid grid-cols-3 sm:grid-cols-5 gap-2 mt-2">
           {files.map((f, i) => (
             <div key={i} className="relative aspect-square rounded-xl overflow-hidden border border-border group">
               <img src={previewUrlsRef.current[i] || ''} alt="" className="w-full h-full object-cover" />

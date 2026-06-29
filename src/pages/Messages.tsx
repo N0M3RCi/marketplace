@@ -48,7 +48,7 @@ export default function Messages() {
   const [filePreview, setFilePreview] = useState<{ file: File; preview: string } | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const socket = useSocket({
     userId: user?.id,
@@ -363,8 +363,8 @@ export default function Messages() {
 
                   {activeConv?.listingId && (
                     <Link to={`/listing/${activeConv.listingId}`}>
-                      <Button variant="outline" size="sm" className="text-xs gap-1.5 hidden sm:flex">
-                        <ShieldCheck className="w-3.5 h-3.5" /> View Listing
+                      <Button variant="outline" size="sm" className="text-xs gap-1.5 flex">
+                        <ShieldCheck className="w-3.5 h-3.5" /> <span className="hidden sm:inline">View Listing</span>
                       </Button>
                     </Link>
                   )}
