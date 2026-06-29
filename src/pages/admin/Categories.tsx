@@ -818,6 +818,7 @@ export default function AdminCategories() {
             </div>
           </div>
         )}
+      </div>
     </div>
   );
 }
