@@ -1,25 +1,9 @@
 import { Server as HTTPServer } from 'http';
 import { Server } from 'socket.io';
 import jwt from 'jsonwebtoken';
-import crypto from 'crypto';
 import pool from './db.js';
+import { JWT_SECRET } from './middleware/auth.js';
 import { sanitizeText } from './middleware/sanitizer.js';
-
-function getJwtSecret(): string {
-  const secret = process.env.JWT_SECRET;
-  if (!secret) {
-    const generated = crypto.randomBytes(32).toString('hex');
-    console.warn(
-      'WARNING: JWT_SECRET environment variable is not set. ' +
-      'Using a randomly generated secret for this session. ' +
-      'ALL EXISTING TOKENS WILL BE INVALIDATED on restart. ' +
-      'Set JWT_SECRET in your environment (e.g. openssl rand -hex 32).'
-    );
-    return generated;
-  }
-  return secret;
-}
-const JWT_SECRET = getJwtSecret();
 
 interface SocketUser {
   userId: string;
@@ -49,9 +33,13 @@ export function setupSocket(httpServer: HTTPServer) {
       const decoded = jwt.verify(token as string, JWT_SECRET) as any;
       // Look up username from database since JWT only stores userId+role
       const userResult = await pool.query(
-        'SELECT username FROM user_profiles WHERE id = $1',
+        'SELECT username, is_active FROM user_profiles WHERE id = $1',
         [decoded.userId]
       );
+      if (!userResult.rows[0] || userResult.rows[0].is_active === false) {
+        next(new Error('Account is not active'));
+        return;
+      }
       const username = userResult.rows[0]?.username || 'User';
       (socket as any).user = { userId: decoded.userId, username };
       next();
@@ -122,6 +110,16 @@ export function setupSocket(httpServer: HTTPServer) {
       }
 
       try {
+        const member = await pool.query(
+          'SELECT buyer_id, seller_id FROM conversations WHERE id = $1',
+          [conversationId]
+        );
+        const conv = member.rows[0];
+        if (!conv || (conv.buyer_id !== user.userId && conv.seller_id !== user.userId)) {
+          callback?.({ ok: false, error: 'Not a participant in this conversation' });
+          return;
+        }
+
         const { v4: uuid } = await import('uuid');
         const id = uuid();
 

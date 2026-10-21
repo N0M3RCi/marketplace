@@ -40,9 +40,9 @@ router.get('/', async (req: AuthRequest, res) => {
 // POST /api/reviews
 router.post('/', async (req: AuthRequest, res) => {
   try {
-    const { sellerId, reviewerId, rating, comment, role } = req.body;
-    if (!sellerId || !reviewerId || !rating) {
-      res.status(400).json({ error: 'sellerId, reviewerId, and rating required' });
+    const { sellerId, rating, comment, role } = req.body;
+    if (!sellerId || !rating) {
+      res.status(400).json({ error: 'sellerId and rating required' });
       return;
     }
     const { v4: uuid } = await import('uuid');
@@ -50,7 +50,7 @@ router.post('/', async (req: AuthRequest, res) => {
     await pool.query(
       `INSERT INTO reviews (id, seller_id, reviewer_id, rating, comment, role)
        VALUES ($1,$2,$3,$4,$5,$6)`,
-      [id, sellerId, reviewerId, Math.min(Math.max(1, rating), 5), comment || null, role || 'buyer']
+      [id, sellerId, req.userId, Math.min(Math.max(1, rating), 5), comment || null, role || 'buyer']
     );
     res.status(201).json({ id, ok: true });
   } catch (err: any) {

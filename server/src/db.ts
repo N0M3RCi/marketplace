@@ -1,6 +1,9 @@
 import pg from 'pg';
 
 const rawConnectionString = process.env.DATABASE_URL;
+if (!rawConnectionString && process.env.NODE_ENV === 'production') {
+  throw new Error('DATABASE_URL is required in production');
+}
 const connectionString = rawConnectionString || 'postgresql://postgres:postgres@localhost:5432/marketplace';
 
 // Log connection diagnostic (password masked)

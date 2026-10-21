@@ -65,6 +65,14 @@ router.post('/', async (req: AuthRequest, res) => {
 // PUT /api/conversations/:id/read
 router.put('/:id/read', async (req: AuthRequest, res) => {
   try {
+    const member = await pool.query(
+      'SELECT id FROM conversations WHERE id = $1 AND (buyer_id = $2 OR seller_id = $2)',
+      [req.params.id, req.userId]
+    );
+    if (member.rows.length === 0 && req.userRole !== 'admin') {
+      res.status(403).json({ error: 'Access denied' });
+      return;
+    }
     const { isBuyer } = req.body;
     await pool.query('UPDATE messages SET is_read = true WHERE conversation_id = $1 AND sender_id != $2', [req.params.id, req.userId]);
     const field = isBuyer ? 'buyer_unread' : 'seller_unread';
