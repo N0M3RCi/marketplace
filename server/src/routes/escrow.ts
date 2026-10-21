@@ -36,6 +36,10 @@ router.get('/:id', async (req: AuthRequest, res) => {
       WHERE e.id = $1`, [req.params.id]);
     if (result.rows.length === 0) { res.status(404).json({ error: 'Case not found' }); return; }
     const e = result.rows[0];
+    if (req.userId !== e.buyer_id && req.userId !== e.seller_id && req.userRole !== 'admin') {
+      res.status(403).json({ error: 'Access denied: you are not a participant in this escrow case' });
+      return;
+    }
     res.json({
       id: e.id, caseNumber: e.case_number, buyerId: e.buyer_id, buyerName: e.buyer_name || 'Unknown',
       sellerId: e.seller_id, sellerName: e.seller_name || 'Unknown',
@@ -113,6 +117,30 @@ router.put('/:id', validate(escrowSchemas.updateEscrow), async (req: AuthRequest
     }
 
     const updates: string[] = []; const vals: any[] = []; let idx = 1;
+    const buyerStatuses = new Set(['payment_submitted', 'buyer_confirmed', 'disputed']);
+    const sellerStatuses = new Set(['packaging_submitted']);
+    const isAdmin = req.userRole === 'admin';
+    const isBuyer = req.userId === esc.buyer_id;
+    if (!isAdmin && req.body.status !== undefined) {
+      const allowedStatuses = isBuyer ? buyerStatuses : sellerStatuses;
+      if (!allowedStatuses.has(req.body.status)) {
+        res.status(403).json({ error: 'You cannot set that escrow status' });
+        return;
+      }
+    }
+    if (!isAdmin && req.body.dispute_status !== undefined && req.body.dispute_status !== 'open') {
+      res.status(403).json({ error: 'Only an admin can close a dispute' });
+      return;
+    }
+    if (!isAdmin && req.body.seller_evidence_status !== undefined && req.body.seller_evidence_status !== 'pending') {
+      res.status(403).json({ error: 'Only an admin can approve seller evidence' });
+      return;
+    }
+    const privileged = ['payment_verified_at', 'payout_status', 'dispute_outcome', 'admin_notes', 'actual_delivery_date', 'delivery_status'];
+    if (!isAdmin && privileged.some((field) => req.body[field] !== undefined)) {
+      res.status(403).json({ error: 'Only an admin can verify payment or release funds' });
+      return;
+    }
     const allowed = ['status', 'payment_address', 'payment_network', 'payment_method', 'payment_reference',
       'payment_proof_url', 'payment_amount_sent', 'payment_submitted_at', 'payment_verified_at', 'payment_admin_notes',
       'seller_item_photos', 'seller_packaging_photos', 'seller_packaging_video', 'seller_readiness_confirmed',
